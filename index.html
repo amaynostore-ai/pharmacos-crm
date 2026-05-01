@@ -980,7 +980,7 @@ function enterApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('visible');
   // Update UI for role
-  const isAdmin=currentUser.role==='admin';
+  const isAdmin=currentUser.role==='admin'||currentUser.role==='manager';
   document.getElementById('sb-av').textContent=currentUser.name.slice(0,2);
   document.getElementById('sb-uname').textContent=currentUser.name;
   document.getElementById('sb-urole').textContent=isAdmin?'مدير النظام':'Agent';
@@ -1041,8 +1041,29 @@ const AGENT_MENU=[
   ]},
 ];
 
+const MANAGER_MENU=[
+  {g:'Principal',items:[
+    {id:'dash',ic:'📊',label:'Dashboard'},
+    {id:'orders',ic:'📦',label:'Commandes'},
+    {id:'shipping',ic:'🚚',label:'Expédition'},
+    {id:'distribute',ic:'🎯',label:'Répartition'},
+  ]},
+  {g:'Équipe',items:[
+    {id:'leaderboard',ic:'🏆',label:'Classement'},
+    {id:'agents',ic:'👥',label:'Agents'},
+  ]},
+  {g:'Analyse',items:[
+    {id:'analytics',ic:'📈',label:'Statistiques'},
+    {id:'cities',ic:'🏙️',label:'Villes'},
+    {id:'stock',ic:'📦',label:'Stock'},
+    {id:'returns',ic:'↩️',label:'Retours'},
+    {id:'followup',ic:'🔔',label:'Suivi'},
+    {id:'blacklist',ic:'🚫',label:'Liste noire'},
+  ]},
+];
+
 function buildSidebar(){
-  const menu=currentUser.role==='admin'?ADMIN_MENU:AGENT_MENU;
+  const menu=currentUser.role==='admin'?ADMIN_MENU:currentUser.role==='manager'?MANAGER_MENU:AGENT_MENU;
   let html='';
   menu.forEach(g=>{
     html+=`<div class="ng"><div class="nl">${g.g}</div>`;
@@ -1060,9 +1081,10 @@ const PAGE_TITLES={dash:'📊 Dashboard',shipping:'🚚 Expédition',distribute:
 
 function P(id){
   // Permission check for agent
-  if(currentUser&&currentUser.role==='agent'){
-    const allowed=['add','myorders','followup','mystats','leaderboard','shipping'];
-    if(!allowed.includes(id)) return;
+  if(currentUser&&currentUser.role!=='admin'){
+    if(currentUser.role==='manager'){const mgrAllowed=['dash','orders','shipping','distribute','leaderboard','agents','analytics','cities','stock','returns','followup','blacklist'];if(!mgrAllowed.includes(id))return;}
+    else if(currentUser.role==='agent'){const allowed=['add','myorders','followup','mystats','leaderboard','shipping'];
+    if(!allowed.includes(id)) return;}
   }
   document.querySelectorAll('.pages>div').forEach(d=>d.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(d=>d.classList.remove('active'));
@@ -1086,7 +1108,7 @@ function P(id){
   else if(id==='cities')RC();
   else if(id==='leaderboard')RLB();
   else if(id==='stock'){
-    if(currentUser&&currentUser.role==='admin') document.getElementById('btn-add-product').style.display='';
+    if(currentUser&&currentUser.role==='admin'){document.getElementById('btn-add-product').style.display='';}
     RStk();
   }
   else if(id==='returns')RRt();
@@ -1282,7 +1304,7 @@ function RO(){
     const ri=orders.indexOf(o);const sc=SC[o.status]||SC['لم يرد'];
     const shipBadge=o.shipStatus==='delivered'?`<span class="call-badge" style="background:#e8f5ea;color:var(--green)">✅ ${o.shipCompany||'—'}</span>`:o.shipStatus==='cancelled'?`<span class="call-badge" style="background:#fff0f0;color:var(--red)">❌ ${o.shipCompany||'—'}</span>`:`<span class="call-badge" style="background:#f0f4f8;color:var(--muted)">⏳ ${o.shipCompany||'—'}</span>`;
     const callBadge=o.callCount?`<span class="call-badge call-${Math.min(o.callCount,3)}">${o.callCount}📞</span>`:'';
-    return`<tr><td style="color:var(--muted);font-size:11px">${o.track||'—'}</td><td style="font-weight:700">${o.name}${blacklist.find(b=>b.phone===o.phone)?'<span class="badge bx" style="margin-right:4px">🚫</span>':''}</td><td style="color:var(--blue)">${o.phone}</td><td>${o.city}</td><td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.product||'—'}</td><td style="text-align:center">${o.qty||1}</td><td style="color:var(--green);font-weight:700">${o.price?o.price+' DH':'—'}</td><td><span class="badge ${sc.cls}">${sc.icon} ${o.status}</span></td><td>${callBadge}${o.callReason?`<span style="font-size:10px;color:var(--muted);display:block"> ${o.callReason}</span>`:''}</td><td>${o.agent||'—'}</td><td style="color:var(--muted);font-size:11px">${o.date||'—'}</td><td><button class="btn btn-s btn-sm" onclick="OE(${ri})" style="margin-left:3px">✏️</button><button class="btn btn-d btn-sm" onclick="OD(${ri})">🗑️</button></td></tr>`;
+    return`<tr><td style="color:var(--muted);font-size:11px">${o.track||'—'}</td><td style="font-weight:700">${o.name}${blacklist.find(b=>b.phone===o.phone)?'<span class="badge bx" style="margin-right:4px">🚫</span>':''}</td><td style="color:var(--blue)">${o.phone}</td><td>${o.city}</td><td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.product||'—'}</td><td style="text-align:center">${o.qty||1}</td><td style="color:var(--green);font-weight:700">${o.price?o.price+' DH':'—'}</td><td><span class="badge ${sc.cls}">${sc.icon} ${o.status}</span></td><td>${callBadge}${o.callReason?`<span style="font-size:10px;color:var(--muted);display:block"> ${o.callReason}</span>`:''}</td><td>${o.agent||'—'}</td><td style="color:var(--muted);font-size:11px">${o.date||'—'}</td><td>${currentUser.role!=='manager'?`<button class="btn btn-s btn-sm" onclick="OE(\${ri})" style="margin-left:3px">✏️</button><button class="btn btn-d btn-sm" onclick="OD(\${ri})">🗑️</button>`:'👁️'}</td></tr>`;
   }).join('');
   document.getElementById('ocnt').textContent=`عرض ${f.length} من ${orders.length} طلبية`;
 }
@@ -1406,7 +1428,7 @@ function addOrder(){
   const prev=clientHistory(phone,-1);
   if((status==='رفض'||status==='ملغى')&&prev.refuse>=2&&!blacklist.find(b=>b.phone===phone)){blacklist.push({id:Date.now(),phone,name,reason:'رفض متكرر',date:new Date().toISOString().split('T')[0]});}
   orders.push(o);save();clearF();alert('✅ تم حفظ الطلبية!');
-  P(currentUser&&currentUser.role==='agent'?'myorders':'orders');
+  P(currentUser&&currentUser.role==='agent'?'myorders':'orders');if(currentUser&&currentUser.role==='manager'){const addBtn=document.getElementById('ni-add');if(addBtn)addBtn.style.display='none';}
 }
 
 function clearF(){['fn','fph','fadr','fnt','ffd','fpr','ftrk'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('client-hist').style.display='none';}
@@ -2121,277 +2143,6 @@ function saveTargets(){agents.forEach((a,i)=>{const el=document.getElementById('
 
 // ============ INIT ============
 loadData();
-
-// ============================================================
-// API LAYER — Remplace localStorage par appels backend
-// ============================================================
-const API_URL = 'https://pharmacos-backend-production.up.railway.app/api';
-let _token = sessionStorage.getItem('ph_token') || null;
-
-// Helper fetch avec auth
-async function api(method, path, body=null) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-  if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
-  if (body) opts.body = JSON.stringify(body);
-  try {
-    const res = await fetch(API_URL + path, opts);
-    const data = await res.json();
-    if (res.status === 401) {
-      // Session expirée
-      _token = null; sessionStorage.removeItem('ph_token');
-      doLogout(); return null;
-    }
-    if (!res.ok) throw new Error(data.error || 'Erreur API');
-    return data;
-  } catch(e) {
-    console.error('API error:', e);
-    showToast('Erreur réseau: ' + e.message);
-    return null;
-  }
-}
-
-// ── Login via API ────────────────────────────────────────────
-async function doLoginAPI() {
-  const username = (document.getElementById('login-user')||{value:''}).value.trim();
-  const pass = (document.getElementById('login-pass')||{value:''}).value.trim();
-  const role = loginTab;
-  const errEl = document.getElementById('login-err');
-
-  if (!username || !pass) { errEl.classList.add('show'); return; }
-
-  const btn = document.querySelector('.login-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Connexion...'; }
-
-  const data = await api('POST', '/auth/login', { username, password: pass, role });
-
-  if (btn) { btn.disabled = false; btn.textContent = '🔓 Se connecter'; }
-
-  if (!data) { errEl.classList.add('show'); return; }
-
-  _token = data.token;
-  sessionStorage.setItem('ph_token', _token);
-  currentUser = data.user;
-  errEl.classList.remove('show');
-  await loadAllData();
-  enterApp();
-}
-
-// ── Register agent via API ───────────────────────────────────
-async function doRegisterAPI() {
-  const name = (document.getElementById('reg-agent-name')||{value:''}).value.trim();
-  const phone = (document.getElementById('reg-agent-phone')||{value:''}).value.trim();
-  const code = (document.getElementById('reg-agent-code')||{value:''}).value.trim();
-  const pass = (document.getElementById('reg-agent-pass')||{value:''}).value.trim();
-  const pass2 = (document.getElementById('reg-agent-pass2')||{value:''}).value.trim();
-
-  if (!name||!phone||!code||!pass||!pass2) return showRegErr('Tous les champs sont obligatoires !');
-  if (pass !== pass2) return showRegErr('Les mots de passe ne correspondent pas !');
-  if (pass.length < 4) return showRegErr('Mot de passe trop court');
-
-  const data = await api('POST', '/auth/register-agent', {
-    name, phone, password: pass, activation_code: code
-  });
-  if (!data) return;
-  showRegOk(data.message || 'Compte créé avec succès !');
-  setTimeout(() => switchMainTab('login'), 2000);
-}
-
-// ── Charger toutes les données après login ───────────────────
-async function loadAllData() {
-  const [ordersData, agentsData, calllogsData] = await Promise.all([
-    api('GET', '/orders'),
-    api('GET', '/agents'),
-    api('GET', '/calllogs'),
-  ]);
-
-  orders    = ordersData?.orders    || [];
-  agents    = agentsData?.agents    || [];
-  callLogs  = calllogsData?.logs    || [];
-
-  // Données locales (non critiques)
-  products  = LS('ph_products', '[]');
-  returns   = LS('ph_returns', '[]');
-  blacklist = LS('ph_blacklist', '[]');
-}
-
-// ── Save order via API ───────────────────────────────────────
-async function saveOrderAPI(orderData, existingId=null) {
-  if (existingId) {
-    const data = await api('PUT', '/orders/' + existingId, orderData);
-    if (!data) return null;
-    const idx = orders.findIndex(o => o.id === existingId);
-    if (idx >= 0) orders[idx] = data.order;
-    return data.order;
-  } else {
-    const data = await api('POST', '/orders', orderData);
-    if (!data) return null;
-    orders.unshift(data.order);
-    return data.order;
-  }
-}
-
-// ── Save call log via API ────────────────────────────────────
-async function saveCallLogAPI(logData) {
-  const data = await api('POST', '/calllogs', logData);
-  if (data) callLogs.unshift(data.log);
-  return data;
-}
-
-// ── Save agent via API ───────────────────────────────────────
-async function saveAgentAPI(agentData, existingId=null) {
-  if (existingId) {
-    const data = await api('PUT', '/agents/' + existingId, agentData);
-    if (!data) return null;
-    const idx = agents.findIndex(a => a.id === existingId);
-    if (idx >= 0) agents[idx] = data.agent;
-    return data.agent;
-  } else {
-    const data = await api('POST', '/agents', agentData);
-    if (!data) return null;
-    agents.push(data.agent);
-    return data.agent;
-  }
-}
-
-// ── Delete order via API ─────────────────────────────────────
-async function deleteOrderAPI(id) {
-  const data = await api('DELETE', '/orders/' + id);
-  if (data) orders = orders.filter(o => o.id !== id);
-  return data;
-}
-
-// ── Logout ───────────────────────────────────────────────────
-function doLogoutAPI() {
-  _token = null;
-  sessionStorage.removeItem('ph_token');
-  orders = []; agents = []; callLogs = [];
-  currentUser = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').classList.remove('hidden');
-}
-
-// ─── Surcharge des fonctions originales ──────────────────────
-// On remplace les fonctions locales par les versions API
-
-// Surcharge doLogin
-const _origDoLogin = typeof doLogin === 'function' ? doLogin : null;
-doLogin = doLoginAPI;
-
-// Surcharge doRegister pour agent
-const _origDoRegister = doRegister;
-doRegister = async function() {
-  if (regTab === 'admin') {
-    // Admin register reste local (rare)
-    _origDoRegister();
-  } else {
-    await doRegisterAPI();
-  }
-};
-
-// Surcharge doLogout
-doLogout = doLogoutAPI;
-
-// Surcharge addOrder
-const _origAddOrder = addOrder;
-addOrder = async function() {
-  const name = (document.getElementById('fn')||{value:''}).value.trim();
-  const phone = (document.getElementById('fph')||{value:''}).value.trim();
-  const city = (document.getElementById('fci')||{value:''}).value.trim();
-  const product = (document.getElementById('fpr')||{value:''}).value.trim();
-  const qty = parseInt((document.getElementById('fqt')||{value:'1'}).value)||1;
-  const price = parseFloat((document.getElementById('fpr2')||{value:'0'}).value)||0;
-  const status = (document.getElementById('fst2')||{value:'لم يرد'}).value||'لم يرد';
-  const notes = (document.getElementById('fno')||{value:''}).value.trim();
-  const followdate = (document.getElementById('ffd')||{value:''}).value;
-  const track = (document.getElementById('ftrk')||{value:''}).value.trim() || genTrack(city);
-  const agentEl = document.getElementById('fagent');
-  const agentName = currentUser.role==='admin' ? (agentEl?agentEl.value:'') : currentUser.name;
-
-  if (!name||!phone) { showToast('Nom et téléphone obligatoires'); return; }
-
-  const orderData = { name, phone, city, product, qty, price, status, notes,
-    followdate: followdate||null, track, agent_name: agentName,
-    date: new Date().toISOString().split('T')[0],
-    ship_company:'Glivo', ship_status:'pending', call_count:0 };
-
-  const saved = await saveOrderAPI(orderData);
-  if (saved) {
-    showToast('✅ Commande ajoutée !');
-    ['fn','fph','fci','fpr','fpr2','fno','ffd','ftrk'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.value='';
-    });
-    RO(); P('orders');
-  }
-};
-
-// Surcharge OD (delete order)
-const _origOD = OD;
-OD = async function(ri) {
-  const o = orders[ri];
-  if (!o) return;
-  if (!confirm('Supprimer cette commande ?')) return;
-  await deleteOrderAPI(o.id);
-  RO();
-};
-
-// Surcharge saveCallLog
-saveCallLog = async function(ri, callNum) {
-  const o = orders[ri]; if(!o) return;
-  const result = document.getElementById('call-result').value;
-  const pdate = result==='postponed'?(document.getElementById('call-pdate')||{value:''}).value:'';
-  const reason = (result==='cancelled'||result==='refused')?(document.getElementById('call-reason')||{value:''}).value.trim():'';
-  const notes = (document.getElementById('call-notes')||{value:''}).value.trim();
-
-  await saveCallLogAPI({
-    order_id: o.id, order_name: o.name, city: o.city,
-    agent_name: o.agent_name||currentUser.name,
-    call_num: callNum, result, postpone_date: pdate||null,
-    reason, notes, ship_company: o.ship_company||'Glivo'
-  });
-
-  // Mise à jour locale optimiste
-  o.call_count = callNum; o.call_result = result;
-  if (result==='delivered') o.ship_status='delivered';
-  else if (result==='cancelled') o.ship_status='cancelled';
-  else if (result==='refused') o.ship_status='refused';
-  else if (result==='voicemail') o.ship_status='voicemail';
-  else if (['no1','no2','no3'].includes(result)) o.ship_status=result;
-  if (reason) o.ship_reason=reason;
-  if (pdate) o.followdate=pdate;
-
-  CM(); RShip();
-};
-
-// Surcharge addAgent
-addAgent = async function() {
-  const name = (document.getElementById('an')||{value:''}).value.trim();
-  const phone = (document.getElementById('aph')||{value:''}).value.trim();
-  const pass = (document.getElementById('apw')||{value:''}).value.trim();
-  const target = parseInt((document.getElementById('atarget')||{value:'30'}).value)||30;
-  if (!name) { showToast('Nom obligatoire'); return; }
-  await saveAgentAPI({ name, phone, password: pass||undefined, target });
-  ['an','aph','apw'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  RAG(); showToast('✅ Agent ajouté !');
-};
-
-// Auto-login si token encore valide
-(async function checkSession() {
-  const savedToken = sessionStorage.getItem('ph_token');
-  if (!savedToken) return;
-  _token = savedToken;
-  const data = await api('GET', '/auth/me');
-  if (data && data.user) {
-    currentUser = data.user;
-    await loadAllData();
-    enterApp();
-  } else {
-    _token = null; sessionStorage.removeItem('ph_token');
-  }
-})();
-
 </script>
 </body>
 </html>
