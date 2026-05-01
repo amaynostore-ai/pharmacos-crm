@@ -2194,7 +2194,7 @@ async function loadAllData() {
   blacklist = LS('ph_blacklist', '[]');
 }
 
-doLogin = doLoginAPI;
+window.doLogin = doLoginAPI;
 
 doLogout = function() {
   _token = null; sessionStorage.removeItem('ph_token');
