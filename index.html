@@ -988,7 +988,7 @@ function enterApp(){
   badge.textContent=currentUser.role==='admin'?'👑 Admin':currentUser.role==='manager'?'👁️ Manager':'👤 Agent';
   badge.className='role-badge '+(isAdmin?'role-admin':'role-agent');
   buildSidebar();
-  P(isAdmin?'dash':'add');
+ P((currentUser.role==='admin'||currentUser.role==='manager')?'dash':'add');
 
 function doLogout(){
   currentUser=null;
