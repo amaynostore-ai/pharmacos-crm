@@ -2140,9 +2140,150 @@ function setAgentTargets(){
   document.getElementById('mo').classList.add('open');
 }
 function saveTargets(){agents.forEach((a,i)=>{const el=document.getElementById('atg-'+i);if(el)a.target=parseInt(el.value)||30;});save();CM();RD();}
-
 // ============ INIT ============
 loadData();
-</script>
-</body>
-</html>
+
+// ============================================================
+// API LAYER
+// ============================================================
+const API_URL = 'https://pharmacos-backend-production.up.railway.app/api';
+let _token = sessionStorage.getItem('ph_token') || null;
+
+async function api(method, path, body=null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API_URL + path, opts);
+    const data = await res.json();
+    if (res.status === 401) { _token = null; sessionStorage.removeItem('ph_token'); doLogout(); return null; }
+    if (!res.ok) throw new Error(data.error || 'Erreur API');
+    return data;
+  } catch(e) { console.error('API error:', e); showToast('Erreur réseau: ' + e.message); return null; }
+}
+
+async function doLoginAPI() {
+  const username = (document.getElementById('login-user')||{value:''}).value.trim();
+  const pass = (document.getElementById('login-pass')||{value:''}).value.trim();
+  const role = loginTab;
+  const errEl = document.getElementById('login-err');
+  if (!username || !pass) { errEl.classList.add('show'); return; }
+  const btn = document.querySelector('.login-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion...'; }
+  const data = await api('POST', '/auth/login', { username, password: pass, role });
+  if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+  if (!data) { errEl.classList.add('show'); return; }
+  _token = data.token;
+  sessionStorage.setItem('ph_token', _token);
+  currentUser = data.user;
+  if (!currentUser.role) currentUser.role = 'agent';
+  errEl.classList.remove('show');
+  await loadAllData();
+  enterApp();
+}
+
+async function loadAllData() {
+  const [ordersData, agentsData, calllogsData] = await Promise.all([
+    api('GET', '/orders'), api('GET', '/agents'), api('GET', '/calllogs'),
+  ]);
+  orders = ordersData?.orders || [];
+  agents = agentsData?.agents || [];
+  callLogs = calllogsData?.logs || [];
+  products = LS('ph_products', '[]');
+  returns = LS('ph_returns', '[]');
+  blacklist = LS('ph_blacklist', '[]');
+}
+
+doLogin = doLoginAPI;
+
+doLogout = function() {
+  _token = null; sessionStorage.removeItem('ph_token');
+  orders = []; agents = []; callLogs = []; currentUser = null;
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+};
+
+addOrder = async function() {
+  const name = (document.getElementById('fn')||{value:''}).value.trim();
+  const phone = (document.getElementById('fph')||{value:''}).value.trim();
+  const city = (document.getElementById('fct')||{value:''}).value;
+  if (!name||!phone||!city) { alert('Nom, téléphone et ville obligatoires!'); return; }
+  const agentEl = document.getElementById('fagt');
+  const agentName = currentUser.role==='agent' ? currentUser.name : (agentEl?agentEl.value:'');
+  const orderData = {
+    name, phone, city,
+    address: (document.getElementById('fadr')||{value:''}).value.trim(),
+    product: (document.getElementById('fprd')||{value:''}).value,
+    qty: parseInt((document.getElementById('fqty')||{value:'1'}).value)||1,
+    price: parseFloat((document.getElementById('fpr')||{value:'0'}).value)||0,
+    status: (document.getElementById('fst2')||{value:'لم يرد'}).value||'لم يرد',
+    notes: (document.getElementById('fnt')||{value:''}).value.trim(),
+    followdate: (document.getElementById('ffd')||{value:''}).value||null,
+    track: (document.getElementById('ftrk')||{value:''}).value.trim() || genTrack(city),
+    agent_name: agentName,
+    date: new Date().toISOString().split('T')[0],
+  };
+  const saved = await api('POST', '/orders', orderData);
+  if (saved) {
+    orders.unshift(saved.order);
+    showToast('Commande ajoutée!');
+    clearF();
+    P(currentUser.role==='agent'?'myorders':'orders');
+  }
+};
+
+OD = async function(ri) {
+  const o = orders[ri]; if (!o) return;
+  if (!confirm('Supprimer cette commande?')) return;
+  const res = await api('DELETE', '/orders/' + o.id);
+  if (res) { orders.splice(ri, 1); RO(); }
+};
+
+saveCallLog = async function(ri, callNum) {
+  const o = orders[ri]; if (!o) return;
+  const result = document.getElementById('call-result').value;
+  const pdate = result==='postponed'?(document.getElementById('call-pdate')||{value:''}).value:'';
+  const reason = (result==='cancelled'||result==='refused')?(document.getElementById('call-reason')||{value:''}).value.trim():'';
+  const notes = (document.getElementById('call-notes')||{value:''}).value.trim();
+  const res = await api('POST', '/calllogs', {
+    order_id: o.id, order_name: o.name, city: o.city,
+    agent_name: o.agent_name||currentUser.name,
+    call_num: callNum, result, postpone_date: pdate||null,
+    reason, notes, ship_company: o.ship_company||'Glivo'
+  });
+  if (res) {
+    o.call_count = callNum; o.call_result = result;
+    if (result==='delivered') o.ship_status='delivered';
+    else if (result==='cancelled') o.ship_status='cancelled';
+    else if (result==='refused') o.ship_status='refused';
+    if (reason) o.ship_reason=reason;
+    CM(); RShip();
+  }
+};
+
+addAgent = async function() {
+  const name = (document.getElementById('an')||{value:''}).value.trim();
+  const phone = (document.getElementById('aph')||{value:''}).value.trim();
+  const pass = (document.getElementById('apw')||{value:''}).value.trim();
+  const target = parseInt((document.getElementById('atarget')||{value:'30'}).value)||30;
+  if (!name) { showToast('Nom obligatoire'); return; }
+  const res = await api('POST', '/agents', { name, phone, password: pass||undefined, target });
+  if (res) { agents.push(res.agent); ['an','aph','apw'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); RAG(); showToast('Agent ajouté!'); }
+};
+
+(async function checkSession() {
+  const savedToken = sessionStorage.getItem('ph_token');
+  if (!savedToken) return;
+  _token = savedToken;
+  const data = await api('GET', '/auth/me');
+  if (data && data.user) {
+    currentUser = data.user;
+    if (!currentUser.role) currentUser.role = 'agent';
+    await loadAllData();
+    enterApp();
+  } else { _token = null; sessionStorage.removeItem('ph_token'); }
+})();
+
+
