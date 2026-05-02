@@ -979,16 +979,16 @@ function doLogin(){
 function enterApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('visible');
-  // Update UI for role
- const isAdmin=currentUser.role==='admin'||currentUser.role==='manager';
+  const isAdmin=currentUser.role==='admin'||currentUser.role==='manager';
   document.getElementById('sb-av').textContent=currentUser.name.slice(0,2);
   document.getElementById('sb-uname').textContent=currentUser.name;
-  document.getElementById('sb-urole').textContent=currentUser.role==='admin'?'مدير النظام':currentUser.role==='manager'?'👁️ Manager':'Agent';
+  document.getElementById('sb-urole').textContent=currentUser.role==='admin'?'مدير النظام':currentUser.role==='manager'?'Manager':'Agent';
   const badge=document.getElementById('role-badge');
-  badge.textContent=currentUser.role==='admin'?'👑 Admin':currentUser.role==='manager'?'👁️ Manager':'👤 Agent';
+  badge.textContent=currentUser.role==='admin'?'Admin':currentUser.role==='manager'?'Manager':'Agent';
   badge.className='role-badge '+(isAdmin?'role-admin':'role-agent');
   buildSidebar();
- P((currentUser.role==='admin'||currentUser.role==='manager')?'dash':'add');
+  P(isAdmin?'dash':'add');
+}
 
 function doLogout(){
   currentUser=null;
