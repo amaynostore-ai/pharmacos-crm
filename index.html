@@ -262,7 +262,7 @@ body{background:var(--gray-bg);color:var(--text);min-height:100vh;font-family:'C
   :root { --sw: 0px; --th: 52px; }
   
   /* Hide sidebar on mobile */
-  #sb { transform: translateX(100%); transition: transform .3s; z-index: 300; width: 260px; left: auto; right: 0; }
+  #sb { transform: translateX(260px); transition: transform .3s; z-index: 300; width: 260px; left: auto; right: 0; }
   #sb.open { transform: translateX(0); }
   
   /* Topbar */
@@ -2289,6 +2289,26 @@ window.doLogout = function() {
   } else { _token = null; sessionStorage.removeItem('ph_token'); }
 })();
 
+
+// ============ MOBILE MENU ============
+function toggleMobMenu() {
+  const sb = document.getElementById('sb');
+  const ov = document.getElementById('mob-overlay');
+  const isOpen = sb.classList.contains('open');
+  if (isOpen) {
+    sb.classList.remove('open');
+    if(ov) ov.style.display = 'none';
+  } else {
+    sb.classList.add('open');
+    if(ov) ov.style.display = 'block';
+  }
+}
+function closeMobMenu() {
+  const sb = document.getElementById('sb');
+  const ov = document.getElementById('mob-overlay');
+  sb.classList.remove('open');
+  if(ov) ov.style.display = 'none';
+}
 </script>
 
 <!-- MOBILE NAV -->
