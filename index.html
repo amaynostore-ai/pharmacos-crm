@@ -1179,9 +1179,14 @@ function P(id){
   else if(id==='analytics'){buildDateRangeBar('analytics-date-range');RA();}
   else if(id==='cities')RC();
   else if(id==='leaderboard')RLB();
+  else if(id==='agents'){
+    api('GET','/agents').then(d=>{if(d&&d.agents){agents=d.agents;}RAG();initSels();});
+    return;
+  }
   else if(id==='stock'){
     if(currentUser&&currentUser.role==='admin') document.getElementById('btn-add-product').style.display='';
-    RStk();
+    api('GET','/products').then(d=>{if(d&&d.products){products=d.products;}RStk();});
+    return;
   }
   else if(id==='returns')RRt();
   else if(id==='followup')RF();
