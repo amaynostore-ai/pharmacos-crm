@@ -2256,12 +2256,15 @@ async function doLoginAPI() {
   const od = await api('GET','/orders');
   const ad = await api('GET','/agents');
   const cd = await api('GET','/calllogs');
+  const pd = await api('GET','/products');
+  const rd = await api('GET','/returns');
+  const bd = await api('GET','/blacklist');
   orders = od ? od.orders : [];
   agents = ad ? ad.agents : [];
   callLogs = cd ? cd.logs : [];
-  products = LS('ph_products','[]');
-  returns = LS('ph_returns','[]');
-  blacklist = LS('ph_blacklist','[]');
+  products = pd ? pd.products : [];
+  returns = rd ? rd.returns : [];
+  blacklist = bd ? bd.blacklist : [];
   enterApp();
 }
 
@@ -2287,12 +2290,15 @@ window.doLogout = function() {
     const od = await api('GET','/orders');
     const ad = await api('GET','/agents');
     const cd = await api('GET','/calllogs');
+    const pd = await api('GET','/products');
+    const rd = await api('GET','/returns');
+    const bd = await api('GET','/blacklist');
     orders = od ? od.orders : [];
     agents = ad ? ad.agents : [];
     callLogs = cd ? cd.logs : [];
-    products = LS('ph_products','[]');
-    returns = LS('ph_returns','[]');
-    blacklist = LS('ph_blacklist','[]');
+    products = pd ? pd.products : [];
+    returns = rd ? rd.returns : [];
+    blacklist = bd ? bd.blacklist : [];
     enterApp();
   } else { _token = null; sessionStorage.removeItem('ph_token'); }
 })();
