@@ -1180,7 +1180,16 @@ function P(id){
   else if(id==='cities')RC();
   else if(id==='leaderboard')RLB();
   else if(id==='agents'){
-    api('GET','/agents').then(d=>{if(d&&d.agents){agents=d.agents;}RAG();initSels();});
+    // Show loading while fetching
+    const aglist=document.getElementById('aglist');
+    const agstats=document.getElementById('agstats');
+    if(aglist) aglist.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">⏳ جاري التحميل...</div>';
+    if(agstats) agstats.innerHTML='';
+    api('GET','/agents').then(d=>{
+      if(d && d.agents){ agents=d.agents; }
+      RAG();
+      initSels();
+    });
     return;
   }
   else if(id==='stock'){
@@ -1561,20 +1570,57 @@ async function addAgent(){
     showToast('Agent ajouté!');
   }
 }
-async function delAgent(i){if(!confirm('حذف هذا Agent؟'))return;const a=agents[i];if(!a)return;const res=await api('DELETE','/agents/'+a.id);if(res){agents.splice(i,1);RAG();}}
+async function delAgent(i){
+  if(!confirm('حذف هذا Agent؟'))return;
+  const a=agents[i];
+  if(!a)return;
+  const res=await api('DELETE','/agents/'+(a.id||a._id));
+  if(res){
+    agents.splice(i,1);
+    RAG();
+    initSels();
+    showToast('Agent supprimé');
+  }
+}
 
 function RAG(){
-  document.getElementById('aglist').innerHTML=agents.map((a,i)=>`
+  const aglistEl=document.getElementById('aglist');
+  const agstatsEl=document.getElementById('agstats');
+  if(!aglistEl||!agstatsEl) return;
+
+  if(!agents||agents.length===0){
+    aglistEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد Agents</div>';
+    agstatsEl.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px">لا توجد بيانات</div>';
+    return;
+  }
+
+  aglistEl.innerHTML=agents.map((a,i)=>`
     <div class="ni-r">
-      <div class="lb-av">${a.name.slice(0,2)}</div>
-      <div style="flex:1"><div style="font-weight:700;font-size:13px">${a.name}</div><div style="font-size:11px;color:var(--muted)">${a.phone}</div></div>
-      <span class="badge bn" style="font-size:10px;margin-left:6px">pass: ${a.pass}</span>
+      <div class="lb-av">${(a.name||'?').slice(0,2)}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px">${a.name||'—'}</div>
+        <div style="font-size:11px;color:var(--muted)">${a.phone||''}</div>
+      </div>
       <button class="btn btn-d btn-sm" onclick="delAgent(${i})">🗑️</button>
-    </div>`).join('')||'<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد Agents</div>';
-  document.getElementById('agstats').innerHTML=agents.map(a=>{
+    </div>`).join('');
+
+  agstatsEl.innerHTML=agents.map(a=>{
     const myO=orders.filter(o=>o.agent===a.name),cn=myO.filter(o=>o.status==='مؤكد').length,rate=myO.length?Math.round(cn/myO.length*100):0;
-    return`<div style="padding:10px;border-radius:8px;background:var(--gray-bg);margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:13px">${a.name}</div><div style="color:#f39c12">${'★'.repeat(Math.round(rate/20))}${'☆'.repeat(5-Math.round(rate/20))}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"><span class="badge bc">${cn} مؤكد</span><span class="badge bn">${myO.length} إجمالي</span><span class="badge ${rate>=50?'bc':'bx'}">${rate}%</span></div></div>`;
-  }).join('')||'<div style="color:var(--muted);text-align:center;padding:20px">لا توجد بيانات</div>';
+    const tgt=a.target||30, tgtPct=Math.min(Math.round(cn/tgt*100),100);
+    return`<div style="padding:10px;border-radius:8px;background:var(--gray-bg);margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-weight:700;font-size:13px">${a.name||'—'}</div>
+        <div style="color:#f39c12">${'★'.repeat(Math.round(rate/20))}${'☆'.repeat(5-Math.round(rate/20))}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span class="badge bc">${cn} مؤكد</span>
+        <span class="badge bn">${myO.length} إجمالي</span>
+        <span class="badge ${rate>=50?'bc':'bx'}">${rate}%</span>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Objectif: ${cn}/${tgt} (${tgtPct}%)</div>
+      <div class="target-bar"><div class="target-fill" style="width:${tgtPct}%;background:${tgtPct>=100?'var(--green)':tgtPct>=50?'var(--gold)':'var(--pk)'}"></div></div>
+    </div>`;
+  }).join('');
 }
 
 // ============ LEADERBOARD ============
