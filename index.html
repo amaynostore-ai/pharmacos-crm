@@ -262,8 +262,16 @@ body{background:var(--gray-bg);color:var(--text);min-height:100vh;font-family:'C
   :root { --sw: 0px; --th: 52px; }
   
   /* Hide sidebar on mobile */
-  #sb { transform: translateX(260px); transition: transform .3s; z-index: 300; width: 260px; left: auto; right: 0; }
-  #sb.open { transform: translateX(0); }
+  #sb { 
+    position: fixed;
+    right: 0;
+    left: auto;
+    width: 260px;
+    transform: translateX(100%);
+    transition: transform .3s ease;
+    z-index: 300;
+  }
+  #sb.open { transform: translateX(0%) !important; }
   
   /* Topbar */
   #tb { left: 0; padding: 0 12px; }
