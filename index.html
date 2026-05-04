@@ -1147,7 +1147,7 @@ function buildSidebar(){
     html+=`<div class="ng"><div class="nl">${g.g}</div>`;
     g.items.forEach(item=>{
       const badge=item.badge?`<span class="nbadge" id="${item.badge}" style="display:none">0</span>`:'';
-      html+=`<div class="ni" onclick="P('${item.id}')" id="ni-${item.id}"><span class="ic">${item.ic}</span> ${item.label}${badge}</div>`;
+      html+=`<div class="ni" onclick="P('${item.id}');closeMobMenu()" id="ni-${item.id}"><span class="ic">${item.ic}</span> ${item.label}${badge}</div>`;
     });
     html+='</div>';
   });
