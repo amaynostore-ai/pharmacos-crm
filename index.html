@@ -1551,13 +1551,18 @@ function SE(){
 function CM(){document.getElementById('mo').classList.remove('open');editIdx=-1;}
 
 // ============ AGENTS (ADMIN ONLY) ============
-function addAgent(){
+async function addAgent(){
   const n=document.getElementById('an').value.trim(),ph=document.getElementById('aph').value.trim(),pw=document.getElementById('apw').value.trim();
-  if(!n||!ph){alert('الاسم والهاتف مطلوبان');return;}
+  const target=parseInt((document.getElementById('atarget')||{value:'30'}).value)||30;
+  if(!n){alert('الاسم مطلوب');return;}
   if(!pw){alert('كلمة المرور مطلوبة!');return;}
-  agents.push({id:'ag'+Date.now(),name:n,phone:ph,pass:pw,date:new Date().toISOString().split('T')[0]});
-  save();['an','aph','apw'].forEach(id=>document.getElementById(id).value='');
-  RAG();initSels();
+  const res = await api('POST', '/agents', { name:n, phone:ph, password:pw, target });
+  if(res){
+    agents.push(res.agent);
+    ['an','aph','apw'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    RAG();initSels();
+    showToast('Agent ajouté!');
+  }
 }
 function delAgent(i){if(!confirm('حذف هذا Agent؟'))return;agents.splice(i,1);save();RAG();}
 
