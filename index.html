@@ -2229,7 +2229,7 @@ function saveCallLog(ri,callNum){
   if(reason) o.callReason=reason;
   if(!callLogs)callLogs=[];
   callLogs.push({id:Date.now(),orderId:o.id,orderName:o.name,city:o.city,agent:o.agent||currentUser.name,date:new Date().toISOString().split('T')[0],callNum,result,postponeDate:pdate,notes,reason,shipCompany:o.shipCompany});
-  save();CM();RShip();
+  api('PUT','/orders/'+o.id,{ship_status:o.shipStatus,call_count:o.callCount,call_result:o.callResult,ship_reason:o.shipReason,followdate:o.followdate}).then(()=>{});CM();RShip();
 }
 
 function editShip(ri){
@@ -2266,7 +2266,7 @@ function saveShip(ri){
   orders[ri].shipStatus=document.getElementById('ess').value;
   const reasonEl=document.getElementById('esr');
   if(reasonEl) orders[ri].shipReason=reasonEl.value.trim();
-  save();CM();RShip();
+  api('PUT','/orders/'+o.id,{ship_status:o.shipStatus,call_count:o.callCount,call_result:o.callResult,ship_reason:o.shipReason,followdate:o.followdate}).then(()=>{});CM();RShip();
 }
 
 // ============ AGENT TARGETS ============
