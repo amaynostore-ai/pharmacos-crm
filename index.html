@@ -931,15 +931,10 @@ function LS(k,d){try{return JSON.parse(localStorage.getItem(k)||d);}catch(e){ret
 function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
 function loadData(){
-  orders=LS('ph_orders','[]');
-  agents=LS('ph_agents','[{"name":"Agent 1","phone":"0600000001","pass":"1234","id":"ag1"},{"name":"Agent 2","phone":"0600000002","pass":"1234","id":"ag2"}]');
-  products=LS('ph_products','[{"name":"كريم مرطب","qty":50,"min":10,"price":150,"id":"p1"},{"name":"سيروم فيتامين C","qty":30,"min":5,"price":200,"id":"p2"},{"name":"غسول وجه","qty":80,"min":15,"price":80,"id":"p3"},{"name":"مقشر جسم","qty":20,"min":8,"price":120,"id":"p4"}]');
-  returns=LS('ph_returns','[]');
-  blacklist=LS('ph_blacklist','[]');
-  callLogs=LS('ph_calllogs','[]');
-  if(!orders.length) seedOrders();
+  // Data loaded from API after login - no localStorage
+  orders=[];agents=[];products=[];returns=[];blacklist=[];callLogs=[];
 }
-function save(){SS('ph_orders',orders);SS('ph_agents',agents);SS('ph_products',products);SS('ph_returns',returns);SS('ph_blacklist',blacklist);SS('ph_calllogs',callLogs);}
+function save(){ /* data saved via API */ }
 
 function seedOrders(){
   const ag=['Agent 1','Agent 2'],prd=['كريم مرطب','سيروم فيتامين C','غسول وجه','مقشر جسم'];
@@ -1493,23 +1488,19 @@ function initSels(){
   const fcit=document.getElementById('fcit');if(fcit){fcit.innerHTML='<option value="">Toutes les villes</option>';CITIES.forEach(c=>{fcit.innerHTML+=`<option value="${c}">${c}</option>`;});}
 }
 
-function addOrder(){
+async function addOrder(){
   const name=document.getElementById('fn').value.trim(),phone=document.getElementById('fph').value.trim(),city=document.getElementById('fct').value;
   if(!name||!phone||!city){alert('الاسم، الهاتف، والمدينة مطلوبة!');return;}
   const status=document.getElementById('fst2').value,qty=parseInt(document.getElementById('fqty').value)||1,prd=document.getElementById('fprd').value;
-  let agentName=document.getElementById('fagt').value;
-  // Force agent's own name if role is agent
+  let agentName=document.getElementById('fagt')?document.getElementById('fagt').value:'';
   if(currentUser&&currentUser.role==='agent') agentName=currentUser.name;
-  const o={id:Date.now(),name,phone,address:document.getElementById('fadr').value.trim(),city,product:prd,qty,track:document.getElementById('ftrk').value||'TRK-'+Date.now().toString(36).toUpperCase().slice(-6),status,agent:agentName,date:new Date().toISOString().split('T')[0],followdate:document.getElementById('ffd').value,notes:document.getElementById('fnt').value.trim(),price:parseFloat(document.getElementById('fpr').value)||0};
-  if(prd&&status==='مؤكد'){const pr=products.find(p=>p.name===prd);if(pr)pr.qty=Math.max(0,pr.qty-qty);}
-  const prev=clientHistory(phone,-1);
-  if((status==='رفض'||status==='ملغى')&&prev.refuse>=2&&!blacklist.find(b=>b.phone===phone)){blacklist.push({id:Date.now(),phone,name,reason:'رفض متكرر',date:new Date().toISOString().split('T')[0]});}
-  orders.push(o);save();clearF();alert('✅ تم حفظ الطلبية!');
-  P(currentUser&&currentUser.role==='agent'?'myorders':'orders');
+  const orderData={name,phone,city,address:document.getElementById('fadr').value.trim(),product:prd,qty,track:document.getElementById('ftrk').value||genTrack(city),status,agent_name:agentName,date:new Date().toISOString().split('T')[0],followdate:document.getElementById('ffd').value||null,notes:document.getElementById('fnt').value.trim(),price:parseFloat(document.getElementById('fpr').value)||0};
+  const res=await api('POST','/orders',orderData);
+  if(res){orders.unshift(res.order);clearF();showToast('✅ تم حفظ الطلبية!');P(currentUser&&currentUser.role==='agent'?'myorders':'orders');}
 }
 
 function clearF(){['fn','fph','fadr','fnt','ffd','fpr','ftrk'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('client-hist').style.display='none';}
-function OD(i){if(!confirm('حذف هذه الطلبية؟'))return;orders.splice(i,1);save();RO();}
+async function OD(i){if(!confirm('حذف هذه الطلبية؟'))return;const o=orders[i];if(!o)return;const res=await api('DELETE','/orders/'+o.id);if(res){orders.splice(i,1);RO();}}
 
 function OE(i){
   editIdx=i;const o=orders[i];
@@ -1541,12 +1532,13 @@ function OE(i){
   document.getElementById('mo').classList.add('open');
 }
 
-function SE(){
+async function SE(){
   if(editIdx<0)return;
   const eagt=document.getElementById('eagt');
-  orders[editIdx]={...orders[editIdx],name:document.getElementById('en').value.trim(),phone:document.getElementById('eph').value.trim(),address:document.getElementById('eadr').value.trim(),city:document.getElementById('ect').value,product:document.getElementById('eprd').value,qty:parseInt(document.getElementById('eqty').value)||1,track:document.getElementById('etrk').value.trim(),status:document.getElementById('est').value,agent:eagt?eagt.value:orders[editIdx].agent,followdate:document.getElementById('efd').value,price:parseFloat(document.getElementById('epr').value)||0,notes:document.getElementById('ent').value.trim()};
-  save();CM();
-  if(currentUser&&currentUser.role==='agent')RMO();else RO();
+  const o=orders[editIdx];
+  const updates={name:document.getElementById('en').value.trim(),phone:document.getElementById('eph').value.trim(),address:document.getElementById('eadr').value.trim(),city:document.getElementById('ect').value,product:document.getElementById('eprd').value,qty:parseInt(document.getElementById('eqty').value)||1,track:document.getElementById('etrk').value.trim(),status:document.getElementById('est').value,agent_name:eagt?eagt.value:o.agent_name,followdate:document.getElementById('efd').value||null,price:parseFloat(document.getElementById('epr').value)||0,notes:document.getElementById('ent').value.trim()};
+  const res=await api('PUT','/orders/'+o.id,updates);
+  if(res){orders[editIdx]=res.order;CM();if(currentUser&&currentUser.role==='agent')RMO();else RO();}
 }
 function CM(){document.getElementById('mo').classList.remove('open');editIdx=-1;}
 
@@ -1564,7 +1556,7 @@ async function addAgent(){
     showToast('Agent ajouté!');
   }
 }
-function delAgent(i){if(!confirm('حذف هذا Agent؟'))return;agents.splice(i,1);save();RAG();}
+async function delAgent(i){if(!confirm('حذف هذا Agent؟'))return;const a=agents[i];if(!a)return;const res=await api('DELETE','/agents/'+a.id);if(res){agents.splice(i,1);RAG();}}
 
 function RAG(){
   document.getElementById('aglist').innerHTML=agents.map((a,i)=>`
@@ -1648,13 +1640,19 @@ function RRt(){
   document.getElementById('rtstats').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px"><div style="background:var(--gray-bg);padding:12px;border-radius:9px;text-align:center"><div style="font-size:11px;color:var(--muted)">إجمالي الرتور</div><div style="font-size:22px;font-weight:800">${total}</div></div><div style="background:var(--gray-bg);padding:12px;border-radius:9px;text-align:center"><div style="font-size:11px;color:var(--muted)">نسبة الرتور</div><div style="font-size:22px;font-weight:800;color:${total/Math.max(orders.length,1)>.1?'var(--red)':'var(--green)'}">${orders.length?Math.round(total/orders.length*100):0}%</div></div></div>${Object.entries(reasons).map(([r,n])=>`<div class="rbar"><div class="rbl" style="width:120px;font-size:10px">${r}</div><div class="rbp"><div class="rbf" style="width:${Math.round(n/total*100)}%"></div></div><div class="rbc">${n}</div></div>`).join('')}`;
   document.getElementById('rtlist').innerHTML=returns.length?returns.slice(-20).reverse().map(r=>`<div class="ni-r"><div style="flex:1"><div style="font-weight:700;font-size:12.5px">${r.track||r.product}</div><div style="font-size:10px;color:var(--muted)">${r.reason} · ${r.product} · x${r.qty}</div>${r.notes?`<div style="font-size:10px;color:var(--muted)">${r.notes}</div>`:''}</div><div style="font-size:11px;color:var(--muted)">${r.date}</div></div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--muted)">لا توجد رتور</div>';
 }
-function addReturn(){
+async function addReturn(){
   const prd=document.getElementById('rtprd').value;if(!prd){alert('اختر المنتج!');return;}
   const qty=parseInt(document.getElementById('rtqty').value)||1;
-  returns.push({id:Date.now(),track:document.getElementById('rtn').value.trim(),product:prd,qty,reason:document.getElementById('rtr').value,notes:document.getElementById('rtnt').value.trim(),date:new Date().toISOString().split('T')[0]});
-  const pr=products.find(p=>p.name===prd);if(pr)pr.qty+=qty;
-  save();['rtn','rtnt'].forEach(id=>document.getElementById(id).value='');document.getElementById('rtqty').value='1';
-  alert('✅ تم تسجيل الرتور!');RRt();
+  const data={track:document.getElementById('rtn').value.trim(),product:prd,qty,reason:document.getElementById('rtr').value,notes:document.getElementById('rtnt').value.trim(),date:new Date().toISOString().split('T')[0]};
+  const res=await api('POST','/returns',data);
+  if(res){
+    returns.unshift(res.return);
+    // Update product qty locally
+    const pr=products.find(p=>p.name===prd);if(pr)pr.qty+=qty;
+    ['rtn','rtnt'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    document.getElementById('rtqty').value='1';
+    showToast('✅ تم تسجيل الرتور!');RRt();
+  }
 }
 
 // ============ FOLLOWUP ============
@@ -1678,13 +1676,13 @@ function RBL(){
   const f=blacklist.filter(b=>!q||b.name.toLowerCase().includes(q)||b.phone.includes(q));
   document.getElementById('bllist').innerHTML=f.length?f.map((b,i)=>`<div class="bl-it"><div><div style="font-weight:700;font-size:13px">🚫 ${b.name}</div><div style="font-size:11px;color:var(--red)">${b.phone} · ${b.reason}</div><div style="font-size:10px;color:var(--muted)">${b.date}</div></div><button class="btn btn-s btn-sm" onclick="delBL(${blacklist.indexOf(b)})">إزالة</button></div>`).join(''):'<div style="text-align:center;color:var(--muted);padding:30px">القائمة السوداء فارغة</div>';
 }
-function delBL(i){blacklist.splice(i,1);save();RBL();}
+async function delBL(i){const b=blacklist[i];if(!b)return;const res=await api('DELETE','/blacklist/'+b.id);if(res){blacklist.splice(i,1);RBL();}}
 function addBL(){
   document.getElementById('mttl').textContent='🚫 إضافة للقائمة السوداء';
   document.getElementById('mbody').innerHTML=`<div class="fg"><label class="fl">الاسم</label><input class="fi" id="bln" placeholder="اسم الزبون"/></div><div class="fg"><label class="fl">الهاتف</label><input class="fi" id="blph" placeholder="06XXXXXXXX"/></div><div class="fg"><label class="fl">Motif</label><input class="fi" id="blr" placeholder="سبب الإضافة"/></div><div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-d" onclick="saveBL()">🚫 إضافة</button><button class="btn btn-s" onclick="CM()">Annuler</button></div>`;
   document.getElementById('mo').classList.add('open');
 }
-function saveBL(){const n=document.getElementById('bln').value.trim(),ph=document.getElementById('blph').value.trim();if(!n||!ph)return;blacklist.push({id:Date.now(),name:n,phone:ph,reason:document.getElementById('blr').value.trim()||'إضافة يدوية',date:new Date().toISOString().split('T')[0]});save();CM();RBL();}
+async function saveBL(){const n=document.getElementById('bln').value.trim(),ph=document.getElementById('blph').value.trim();if(!n||!ph)return;const data={name:n,phone:ph,reason:document.getElementById('blr').value.trim()||'إضافة يدوية',date:new Date().toISOString().split('T')[0]};const res=await api('POST','/blacklist',data);if(res){blacklist.push(res.item);CM();RBL();}}
 
 // ============ AI COACH ============
 async function askAI(q){document.getElementById('aiinp').value=q;await sndAI();}
