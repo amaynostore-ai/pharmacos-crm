@@ -2261,12 +2261,14 @@ function editShip(ri){
   document.getElementById('mo').classList.add('open');
 }
 
-function saveShip(ri){
-  orders[ri].shipCompany=document.getElementById('esc').value;
-  orders[ri].shipStatus=document.getElementById('ess').value;
+async function saveShip(ri){
+  const o=orders[ri];if(!o)return;
+  o.shipCompany=document.getElementById('esc').value;
+  o.shipStatus=document.getElementById('ess').value;
   const reasonEl=document.getElementById('esr');
-  if(reasonEl) orders[ri].shipReason=reasonEl.value.trim();
-  api('PUT','/orders/'+o.id,{ship_status:o.shipStatus,call_count:o.callCount,call_result:o.callResult,ship_reason:o.shipReason,followdate:o.followdate}).then(()=>{});CM();RShip();
+  if(reasonEl) o.shipReason=reasonEl.value.trim();
+  await api('PUT','/orders/'+o.id,{ship_company:o.shipCompany,ship_status:o.shipStatus,ship_reason:o.shipReason||''});
+  CM();RShip();
 }
 
 // ============ AGENT TARGETS ============
