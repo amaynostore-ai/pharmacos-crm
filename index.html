@@ -2322,7 +2322,7 @@ async function doLoginAPI() {
   const pd = await api('GET','/products');
   const rd = await api('GET','/returns');
   const bd = await api('GET','/blacklist');
-  orders = od ? od.orders : [];
+  orders = od ? od.orders.map(o=>({...o,shipStatus:o.ship_status||'pending',shipCompany:o.ship_company||'Glivo',shipReason:o.ship_reason||'',callCount:o.call_count||0,callResult:o.call_result||''})) : [];
   agents = ad ? ad.agents : [];
   callLogs = cd ? cd.logs : [];
   products = pd ? pd.products : [];
@@ -2356,7 +2356,7 @@ window.doLogout = function() {
     const pd = await api('GET','/products');
     const rd = await api('GET','/returns');
     const bd = await api('GET','/blacklist');
-    orders = od ? od.orders : [];
+    orders = od ? od.orders.map(o=>({...o,shipStatus:o.ship_status||'pending',shipCompany:o.ship_company||'Glivo',shipReason:o.ship_reason||'',callCount:o.call_count||0,callResult:o.call_result||''})) : [];
     agents = ad ? ad.agents : [];
     callLogs = cd ? cd.logs : [];
     products = pd ? pd.products : [];
