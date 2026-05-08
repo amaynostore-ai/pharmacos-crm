@@ -1496,8 +1496,7 @@ async function addOrder(){
   const name=document.getElementById('fn').value.trim(),phone=document.getElementById('fph').value.trim(),city=document.getElementById('fct').value;
   if(!name||!phone||!city){alert('الاسم، الهاتف، والمدينة مطلوبة!');return;}
   const status=document.getElementById('fst2').value,qty=parseInt(document.getElementById('fqty').value)||1,prd=document.getElementById('fprd').value;
-  let agentName=document.getElementById('fagt')?document.getElementById('fagt').value:'';
-  if(currentUser&&currentUser.role==='agent') agentName=currentUser.name;
+  let agentName='';const _faEl=document.getElementById('fagt');if(currentUser&&currentUser.role==='agent'){agentName=currentUser.name;}else{agentName=(_faEl&&_faEl.value)?_faEl.value:'';}
   const orderData={name,phone,city,address:document.getElementById('fadr').value.trim(),product:prd,qty,track:document.getElementById('ftrk').value||genTrack(city),status,agent_name:agentName,date:new Date().toISOString().split('T')[0],followdate:document.getElementById('ffd').value||null,notes:document.getElementById('fnt').value.trim(),price:parseFloat(document.getElementById('fpr').value)||0};
   const res=await api('POST','/orders',orderData);
   if(res){orders.unshift(res.order);clearF();showToast('✅ تم حفظ الطلبية!');P(currentUser&&currentUser.role==='agent'?'myorders':'orders');}
@@ -2233,7 +2232,7 @@ loadData();
 
 // ============ API LAYER ============
 const API_URL = 'https://pharmacos-backend-production.up.railway.app/api';
-let _token = sessionStorage.getItem('ph_token') || null;
+let _token = localStorage.getItem('ph_token') || null;
 
 async function api(method, path, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -2242,7 +2241,7 @@ async function api(method, path, body) {
   try {
     const res = await fetch(API_URL + path, opts);
     const data = await res.json();
-    if (res.status === 401) { _token = null; sessionStorage.removeItem('ph_token'); doLogout(); return null; }
+    if (res.status === 401) { _token = null; localStorage.removeItem('ph_token'); doLogout(); return null; }
     if (!res.ok) throw new Error(data.error || 'Erreur API');
     return data;
   } catch(e) { console.error('API error:', e); showToast('Erreur: ' + e.message); return null; }
@@ -2259,7 +2258,7 @@ async function doLoginAPI() {
   if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
   if (!data) { errEl.classList.add('show'); return; }
   _token = data.token;
-  sessionStorage.setItem('ph_token', _token);
+  localStorage.setItem('ph_token', _token);
   currentUser = data.user;
   if (!currentUser.role) currentUser.role = 'agent';
   errEl.classList.remove('show');
@@ -2281,7 +2280,7 @@ async function doLoginAPI() {
 window.doLogin = doLoginAPI;
 
 window.doLogout = function() {
-  _token = null; sessionStorage.removeItem('ph_token');
+  _token = null; localStorage.removeItem('ph_token');
   orders = []; agents = []; callLogs = []; currentUser = null;
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').classList.remove('hidden');
@@ -2290,7 +2289,7 @@ window.doLogout = function() {
 };
 
 (async function checkSession() {
-  const t = sessionStorage.getItem('ph_token');
+  const t = localStorage.getItem('ph_token');
   if (!t) return;
   _token = t;
   const data = await api('GET', '/auth/me');
@@ -2310,7 +2309,7 @@ window.doLogout = function() {
     returns = rd ? rd.returns : [];
     blacklist = bd ? bd.blacklist : [];
     enterApp();
-  } else { _token = null; sessionStorage.removeItem('ph_token'); }
+  } else { _token = null; localStorage.removeItem('ph_token'); }
 })();
 
 
