@@ -1628,9 +1628,9 @@ function RStk(){
   }).join('');
   charts.stk=new Chart(document.getElementById('stkcC'),{type:'bar',data:{labels:products.map(p=>p.name),datasets:[{label:'المخزون',data:products.map(p=>p.qty),backgroundColor:products.map(p=>p.qty===0?'#d63031':p.qty<=p.min?'#e67e22':'#1B5E35'),borderRadius:6},{label:'الحد الأدنى',data:products.map(p=>p.min),backgroundColor:'rgba(107,122,141,0.3)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{y:{beginAtZero:true}}}});
 }
-async async function updMin(i,v){const p=products[i];const res=await api('PUT','/products/'+p.id,{min:parseInt(v)||0});if(res&&res.product)products[i]=res.product;}
-async async function delPrd(i){if(!confirm('حذف المنتج؟'))return;const p=products[i];const res=await api('DELETE','/products/'+p.id);if(res){products.splice(i,1);RStk();}}
-async async function adjStock(i){const n=prompt(`الكمية الجديدة لـ "${products[i].name}" (حالياً: ${products[i].qty})`);if(n!==null&&!isNaN(parseInt(n))){const p=products[i];const res=await api('PUT','/products/'+p.id,{qty:parseInt(n)});if(res&&res.product){products[i]=res.product;RStk();}}}
+async function updMin(i,v){const p=products[i];const res=await api('PUT','/products/'+p.id,{min:parseInt(v)||0});if(res&&res.product)products[i]=res.product;}
+async function delPrd(i){if(!confirm('حذف المنتج؟'))return;const p=products[i];const res=await api('DELETE','/products/'+p.id);if(res){products.splice(i,1);RStk();}}
+async function adjStock(i){const n=prompt(`الكمية الجديدة لـ "${products[i].name}" (حالياً: ${products[i].qty})`);if(n!==null&&!isNaN(parseInt(n))){const p=products[i];const res=await api('PUT','/products/'+p.id,{qty:parseInt(n)});if(res&&res.product){products[i]=res.product;RStk();}}}
 function addProduct(){
   document.getElementById('mttl').textContent='➕ منتج جديد';
   document.getElementById('mbody').innerHTML=`<div class="mg"><div class="fg"><label class="fl">اسم المنتج</label><input class="fi" id="pname" placeholder="اسم المنتج"/></div><div class="fg"><label class="fl">Quantité</label><input class="fi" id="pqty" type="number" value="0"/></div><div class="fg"><label class="fl">الحد الأدنى</label><input class="fi" id="pmin" type="number" value="5"/></div><div class="fg"><label class="fl">السعر</label><input class="fi" id="pprice" type="number" value="0"/></div><div class="fg"><label class="fl">📍 Emplacement</label><input class="fi" id="pemplacement" placeholder="ex: A 1-2"/></div><div class="fg"><label class="fl">🔢 Barcode</label><div style="display:flex;gap:6px"><input class="fi" id="pbarcode" placeholder="ex: 6123456789" style="flex:1"/><button class="btn btn-s" onclick="genBarcode()" style="white-space:nowrap">⚡ Auto</button></div></div></div><div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-p" onclick="savePrd()">💾 حفظ</button><button class="btn btn-s" onclick="CM()">Annuler</button></div>`;
@@ -2226,7 +2226,7 @@ function setAgentTargets(){
   document.getElementById('mbody').innerHTML=agents.map((a,i)=>`<div class="fg"><label class="fl">${a.name} — Objectif mensuel</label><input class="fi" id="atg-${i}" type="number" value="${a.target||30}" min="1"/></div>`).join('')+`<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p" onclick="saveTargets()">💾 حفظ</button><button class="btn btn-s" onclick="CM()">Annuler</button></div>`;
   document.getElementById('mo').classList.add('open');
 }
-async async function saveTargets(){const promises=agents.map((a,i)=>{const el=document.getElementById('atg-'+i);if(!el)return;const newTarget=parseInt(el.value)||30;return api('PUT','/agents/'+a.id,{target:newTarget}).then(res=>{if(res&&res.agent)a.target=res.agent.target;});});await Promise.all(promises.filter(Boolean));CM();RD();}
+async function saveTargets(){const promises=agents.map((a,i)=>{const el=document.getElementById('atg-'+i);if(!el)return;const newTarget=parseInt(el.value)||30;return api('PUT','/agents/'+a.id,{target:newTarget}).then(res=>{if(res&&res.agent)a.target=res.agent.target;});});await Promise.all(promises.filter(Boolean));CM();RD();}
 
 // ============ INIT ============
 loadData();
