@@ -2191,27 +2191,60 @@ function logCall(ri){
   document.getElementById('mo').classList.add('open');
 }
 
-function saveCallLog(ri,callNum){
+async function saveCallLog(ri,callNum){
   const o=orders[ri];if(!o)return;
   const result=document.getElementById('call-result').value;
   const pdate=result==='postponed'?document.getElementById('call-pdate').value:'';
   const reason=(result==='cancelled'||result==='refused')?(document.getElementById('call-reason')||{value:''}).value.trim():'';
   const notes=document.getElementById('call-notes').value.trim();
-  o.callCount=callNum;o.callResult=result;
-  // Update shipStatus based on result
-  if(result==='delivered') o.shipStatus='delivered';
-  else if(result==='cancelled') o.shipStatus='cancelled';
-  else if(result==='refused') o.shipStatus='refused';
-  else if(result==='voicemail') o.shipStatus='voicemail';
-  else if(result==='no1') o.shipStatus='no1';
-  else if(result==='no2') o.shipStatus='no2';
-  else if(result==='no3') o.shipStatus='no3';
-  else if(result==='postponed'&&pdate){o.followdate=pdate;o.shipStatus='pending';}
-  if(reason) o.shipReason=reason;
-  if(reason) o.callReason=reason;
+
+  // Determine new shipStatus
+  let newShipStatus = o.shipStatus;
+  if(result==='delivered') newShipStatus='delivered';
+  else if(result==='cancelled') newShipStatus='cancelled';
+  else if(result==='refused') newShipStatus='refused';
+  else if(result==='voicemail') newShipStatus='voicemail';
+  else if(result==='no1') newShipStatus='no1';
+  else if(result==='no2') newShipStatus='no2';
+  else if(result==='no3') newShipStatus='no3';
+  else if(result==='postponed'&&pdate) newShipStatus='pending';
+
+  // Save shipStatus + callCount to order in API
+  const orderUpdate = {
+    shipStatus: newShipStatus,
+    ship_status: newShipStatus,
+    callCount: callNum,
+    call_count: callNum,
+    callResult: result,
+  };
+  if(reason){ orderUpdate.shipReason=reason; orderUpdate.ship_reason=reason; }
+  if(result==='postponed'&&pdate){ orderUpdate.followdate=pdate; }
+
+  const orderRes = await api('PUT', '/orders/'+o.id, orderUpdate);
+
+  // Save call log to API
+  const logData = {
+    order_id: o.id,
+    agent_name: o.agent_name || o.agent || currentUser.name,
+    call_num: callNum,
+    result,
+    postpone_date: pdate||null,
+    notes,
+    reason,
+    ship_company: o.shipCompany||''
+  };
+  const logRes = await api('POST', '/calllogs', logData);
+
+  // Update locally
+  o.callCount=callNum; o.callResult=result;
+  o.shipStatus=newShipStatus;
+  if(reason){o.shipReason=reason;o.callReason=reason;}
+  if(result==='postponed'&&pdate) o.followdate=pdate;
   if(!callLogs)callLogs=[];
   callLogs.push({id:Date.now(),orderId:o.id,orderName:o.name,city:o.city,agent:o.agent||currentUser.name,date:new Date().toISOString().split('T')[0],callNum,result,postponeDate:pdate,notes,reason,shipCompany:o.shipCompany});
-  save();CM();RShip();
+
+  showToast('✅ تم حفظ المكالمة!');
+  CM(); RShip();
 }
 
 function editShip(ri){
@@ -2243,12 +2276,34 @@ function editShip(ri){
   document.getElementById('mo').classList.add('open');
 }
 
-function saveShip(ri){
-  orders[ri].shipCompany=document.getElementById('esc').value;
-  orders[ri].shipStatus=document.getElementById('ess').value;
-  const reasonEl=document.getElementById('esr');
-  if(reasonEl) orders[ri].shipReason=reasonEl.value.trim();
-  save();CM();RShip();
+async function saveShip(ri){
+  const o = orders[ri]; if(!o) return;
+  const shipCompany = document.getElementById('esc').value;
+  const shipStatus = document.getElementById('ess').value;
+  const reasonEl = document.getElementById('esr');
+  const shipReason = reasonEl ? reasonEl.value.trim() : '';
+
+  const res = await api('PUT', '/orders/' + o.id, {
+    ship_company: shipCompany,
+    ship_status: shipStatus,
+    ship_reason: shipReason,
+    // send both naming conventions for backend compatibility
+    shipCompany, shipStatus, shipReason
+  });
+
+  if(res) {
+    orders[ri].shipCompany = shipCompany;
+    orders[ri].shipStatus = shipStatus;
+    if(shipReason) orders[ri].shipReason = shipReason;
+    showToast('✅ تم تحديث حالة الشحن!');
+  } else {
+    // Update locally even if API fails (offline mode)
+    orders[ri].shipCompany = shipCompany;
+    orders[ri].shipStatus = shipStatus;
+    if(shipReason) orders[ri].shipReason = shipReason;
+    showToast('⚠️ تم الحفظ محلياً فقط');
+  }
+  CM(); RShip();
 }
 
 // ============ AGENT TARGETS ============
