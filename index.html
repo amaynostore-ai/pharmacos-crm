@@ -2230,10 +2230,20 @@ async function api(method, path, body) {
   try {
     const res = await fetch(API_URL + path, opts);
     const data = await res.json();
-    if (res.status === 401) { _token = null; localStorage.removeItem('ph_token'); doLogout(); return null; }
+    if (res.status === 401) { 
+      _token = null; 
+      localStorage.removeItem('ph_token'); 
+      localStorage.removeItem('ph_user');
+      doLogout(); 
+      return null; 
+    }
     if (!res.ok) throw new Error(data.error || 'Erreur API');
     return data;
-  } catch(e) { console.error('API error:', e); showToast('Erreur: ' + e.message); return null; }
+  } catch(e) { 
+    // Network error — don't logout, just log it
+    console.error('API error:', path, e.message); 
+    return null; 
+  }
 }
 
 async function doLoginAPI() {
@@ -2274,28 +2284,46 @@ window.doLogout = doLogout;
   const t = localStorage.getItem('ph_token');
   if (!t) return;
   _token = t;
-  const data = await api('GET', '/auth/me');
-  if (data && data.user) {
-    currentUser = data.user;
-    if (!currentUser.role) currentUser.role = 'agent';
-    const od = await api('GET','/orders');
-    const ad = await api('GET','/agents');
-    const cd = await api('GET','/calllogs');
-    const pd = await api('GET','/products');
-    const rd = await api('GET','/returns');
-    const bd = await api('GET','/blacklist');
-    orders = od ? od.orders : [];
-    agents = ad ? ad.agents : [];
-    callLogs = cd ? cd.logs : [];
-    products = pd ? pd.products : [];
-    returns = rd ? rd.returns : [];
-    blacklist = bd ? bd.blacklist : [];
-    enterApp();
-  } else {
-    // Token expired or invalid — clear everything
-    _token = null;
-    localStorage.removeItem('ph_token');
-    localStorage.removeItem('ph_user');
+
+  // Show loading indicator while checking session
+  const loginScreen = document.getElementById('login-screen');
+  const loadingDiv = document.createElement('div');
+  loadingDiv.id = 'session-loader';
+  loadingDiv.style.cssText = 'position:fixed;inset:0;z-index:2000;background:#0d2b1a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;';
+  loadingDiv.innerHTML = '<div style="width:44px;height:44px;border:4px solid #1B5E35;border-top-color:#a8d5b8;border-radius:50%;animation:spin 0.8s linear infinite"></div><div style="color:#a8d5b8;font-family:Cairo,sans-serif;font-size:14px">جاري تحميل البيانات...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+  document.body.appendChild(loadingDiv);
+
+  try {
+    const data = await api('GET', '/auth/me');
+    if (data && data.user) {
+      currentUser = data.user;
+      if (!currentUser.role) currentUser.role = 'agent';
+      const od = await api('GET','/orders');
+      const ad = await api('GET','/agents');
+      const cd = await api('GET','/calllogs');
+      const pd = await api('GET','/products');
+      const rd = await api('GET','/returns');
+      const bd = await api('GET','/blacklist');
+      orders = od ? od.orders : [];
+      agents = ad ? ad.agents : [];
+      callLogs = cd ? cd.logs : [];
+      products = pd ? pd.products : [];
+      returns = rd ? rd.returns : [];
+      blacklist = bd ? bd.blacklist : [];
+      loadingDiv.remove();
+      enterApp();
+    } else {
+      // Token expired (401) — clear and go to login
+      _token = null;
+      localStorage.removeItem('ph_token');
+      localStorage.removeItem('ph_user');
+      loadingDiv.remove();
+    }
+  } catch(e) {
+    // Network error — keep token, just show login (user can retry)
+    console.warn('Session check failed (network?):', e);
+    loadingDiv.remove();
+    // Do NOT clear token on network errors
   }
 })();
 
