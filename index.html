@@ -1070,14 +1070,15 @@ function enterApp(){
 }
 
 function doLogout(){
-  if(typeof window.doLogout === 'function' && window.doLogout !== doLogout){
-    window.doLogout(); return;
-  }
-  currentUser=null;
+  _token = null;
+  localStorage.removeItem('ph_token');
+  localStorage.removeItem('ph_user');
+  currentUser = null;
+  orders = []; agents = []; callLogs = []; products = []; returns = []; blacklist = [];
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('login-user').value='';
-  document.getElementById('login-pass').value='';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
   document.getElementById('login-err').classList.remove('show');
 }
 
@@ -2267,16 +2268,7 @@ async function doLoginAPI() {
 
 window.doLogin = doLoginAPI;
 
-window.doLogout = function() {
-  _token = null; 
-  localStorage.removeItem('ph_token');
-  localStorage.removeItem('ph_user');
-  orders = []; agents = []; callLogs = []; currentUser = null;
-  document.getElementById('app').classList.remove('visible');
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('login-user').value = '';
-  document.getElementById('login-pass').value = '';
-};
+window.doLogout = doLogout;
 
 (async function checkSession() {
   const t = localStorage.getItem('ph_token');
