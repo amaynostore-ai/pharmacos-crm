@@ -2213,7 +2213,7 @@ async function saveCallLog(ri,callNum){
   const logRes = await api('POST', '/calllogs', logData);
 
   if(logRes) {
-    // الـ backend كيحدث ship_status تلقائياً — نحدثو محلياً
+    // تحديث الـ order محلياً
     let newShipStatus = o.shipStatus;
     if(result==='delivered') newShipStatus='delivered';
     else if(result==='cancelled') newShipStatus='cancelled';
@@ -2279,13 +2279,10 @@ async function saveShip(ri){
     updated_at: new Date().toISOString()
   });
 
-  if(res) {
-    orders[ri].shipStatus = shipStatus;
-    orders[ri].shipCompany = shipCompany;
-    if(shipReason) orders[ri].shipReason = shipReason;
+  if(res && res.order) {
+    orders[ri] = normalizeOrder(res.order);
     showToast('✅ تم تحديث حالة الشحن!');
   } else {
-    // حفظ محلي فقط إذا فشل الـ API
     orders[ri].shipStatus = shipStatus;
     orders[ri].shipCompany = shipCompany;
     if(shipReason) orders[ri].shipReason = shipReason;
@@ -2375,6 +2372,19 @@ async function doLoginAPI() {
   enterApp();
 }
 
+// تحويل أسماء الـ columns من snake_case لـ camelCase
+function normalizeOrder(o) {
+  return {
+    ...o,
+    agent: o.agent || o.agent_name || '',
+    shipStatus: o.shipStatus || o.ship_status || 'pending',
+    shipCompany: o.shipCompany || o.ship_company || 'Glivo',
+    shipReason: o.shipReason || o.ship_reason || '',
+    callCount: o.callCount || o.call_count || 0,
+    callResult: o.callResult || o.call_result || '',
+  };
+}
+
 // Load all data sequentially with delays to avoid 429
 async function loadAllData() {
   const delay = ms => new Promise(r => setTimeout(r, ms));
@@ -2384,7 +2394,7 @@ async function loadAllData() {
   const pd = await api('GET','/products'); await delay(300);
   const rd = await api('GET','/returns'); await delay(300);
   const bd = await api('GET','/blacklist');
-  orders = od ? od.orders.map(o=>({...o, agent: o.agent||o.agent_name||''})) : [];
+  orders = od ? od.orders.map(normalizeOrder) : [];
   agents = ad ? ad.agents : [];
   callLogs = cd ? cd.logs : [];
   products = pd ? pd.products : [];
