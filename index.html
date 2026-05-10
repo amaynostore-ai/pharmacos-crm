@@ -1047,30 +1047,15 @@ function switchLoginTab(tab, el){
 }
 
 function doLogin(){
-  const user=document.getElementById('login-user').value.trim();
-  const pass=document.getElementById('login-pass').value.trim();
-  const err=document.getElementById('login-err');
-  
-  if(loginTab==='admin'){
-    const adminPass=LS('ph_admin_pass','"admin123"');
-    if(user==='admin' && pass===adminPass){
-      currentUser={name:'Admin',role:'admin',agentId:null};
-      enterApp();
-    } else {
-      err.classList.add('show');
-    }
-  } else {
-    const found=agents.find(a=>a.name===user && a.pass===pass);
-    if(found){
-      currentUser={name:found.name,role:'agent',agentId:found.id};
-      enterApp();
-    } else {
-      err.classList.add('show');
-    }
-  }
+  // Redirect to API login
+  if(typeof doLoginAPI === 'function') { doLoginAPI(); return; }
+  // Fallback if API not loaded yet
+  document.getElementById('login-err').classList.add('show');
 }
 
 function enterApp(){
+  // Save user info for session persistence across refresh
+  if(currentUser) localStorage.setItem('ph_user', JSON.stringify(currentUser));
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('visible');
   const isAdmin=currentUser.role==='admin'||currentUser.role==='manager';
@@ -1085,6 +1070,9 @@ function enterApp(){
 }
 
 function doLogout(){
+  if(typeof window.doLogout === 'function' && window.doLogout !== doLogout){
+    window.doLogout(); return;
+  }
   currentUser=null;
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').classList.remove('hidden');
@@ -2280,7 +2268,9 @@ async function doLoginAPI() {
 window.doLogin = doLoginAPI;
 
 window.doLogout = function() {
-  _token = null; localStorage.removeItem('ph_token');
+  _token = null; 
+  localStorage.removeItem('ph_token');
+  localStorage.removeItem('ph_user');
   orders = []; agents = []; callLogs = []; currentUser = null;
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').classList.remove('hidden');
@@ -2309,7 +2299,12 @@ window.doLogout = function() {
     returns = rd ? rd.returns : [];
     blacklist = bd ? bd.blacklist : [];
     enterApp();
-  } else { _token = null; localStorage.removeItem('ph_token'); }
+  } else {
+    // Token expired or invalid — clear everything
+    _token = null;
+    localStorage.removeItem('ph_token');
+    localStorage.removeItem('ph_user');
+  }
 })();
 
 
