@@ -2321,51 +2321,27 @@ loadData();
 const API_URL = 'https://pharmacos-backend-production.up.railway.app/api';
 let _token = localStorage.getItem('ph_token') || null;
 
-// ===== RATE LIMIT PROTECTION =====
-let _apiQueue = Promise.resolve();
-let _cache = {};
-const CACHE_MS = 30000; // 30 ثانية cache للـ GET
-
 async function api(method, path, body) {
-  // Cache للـ GET requests
-  const cacheKey = method + path;
-  if(method === 'GET' && _cache[cacheKey] && Date.now() - _cache[cacheKey].t < CACHE_MS) {
-    return _cache[cacheKey].d;
-  }
-  // Queue لتفادي الطلبات المتزامنة
-  return _apiQueue = _apiQueue.then(async () => {
-    await new Promise(r => setTimeout(r, 100));
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
-    if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
-    if (body) opts.body = JSON.stringify(body);
-    try {
-      let res = await fetch(API_URL + path, opts);
-      // Retry بعد 2 ثانية إذا 429
-      if(res.status === 429) {
-        await new Promise(r => setTimeout(r, 2000));
-        res = await fetch(API_URL + path, opts);
-      }
-      const data = await res.json();
-      if (res.status === 401) {
-        _token = null;
-        localStorage.removeItem('ph_token');
-        localStorage.removeItem('ph_user');
-        doLogout();
-        return null;
-      }
-      if (!res.ok) throw new Error(data.error || 'Erreur API');
-      if(method === 'GET') _cache[cacheKey] = {t: Date.now(), d: data};
-      // Clear cache for related endpoints after write
-      if(method !== 'GET') {
-        const base = path.split('/')[1];
-        Object.keys(_cache).forEach(k => { if(k.includes(base)) delete _cache[k]; });
-      }
-      return data;
-    } catch(e) {
-      console.error('API error:', path, e.message);
-      return null;
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API_URL + path, opts);
+    const data = await res.json();
+    if (res.status === 401) { 
+      _token = null; 
+      localStorage.removeItem('ph_token'); 
+      localStorage.removeItem('ph_user');
+      doLogout(); 
+      return null; 
     }
-  });
+    if (!res.ok) throw new Error(data.error || 'Erreur API');
+    return data;
+  } catch(e) { 
+    // Network error — don't logout, just log it
+    console.error('API error:', path, e.message); 
+    return null; 
+  }
 }
 
 async function doLoginAPI() {
