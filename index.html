@@ -1194,7 +1194,7 @@ function getS(src2){
 function updBadges(){
   const td=new Date().toISOString().split('T')[0];
   let myOrders=orders;
-  if(currentUser&&currentUser.role==='agent') myOrders=orders.filter(o=>o.agent===currentUser.name);
+  if(currentUser&&currentUser.role==='agent') myOrders=orders.filter(o=>(o.agent||o.agent_name||"")===currentUser.name);
   const cnt=myOrders.filter(o=>o.followdate&&o.followdate<=td).length;
   ['nb-orders'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent=cnt||'';el.style.display=cnt?'inline':'none';}});
 }
@@ -1216,7 +1216,7 @@ function RD(){
     atSec.style.display='';
     const tl=document.getElementById('agent-targets-list');
     if(tl)tl.innerHTML=agents.map(a=>{
-      const acn=filtOrders.filter(o=>o.agent===a.name&&o.status==='مؤكد').length;
+      const acn=filtOrders.filter(o=>(o.agent||o.agent_name||"")===a.name&&o.status==='مؤكد').length;
       const tgt=a.target||30;const pct=Math.min(100,Math.round(acn/tgt*100));
       const col=pct>=100?'var(--green)':pct>=60?'var(--orange)':'var(--red)';
       return`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:3px"><span>${a.name}</span><span style="color:${col}">${acn}/${tgt} (${pct}%)</span></div><div class="target-bar"><div class="target-fill" style="width:${pct}%;background:${col}"></div></div></div>`;
@@ -1379,7 +1379,11 @@ function RMO(){
   if(!currentUser) return;
   const q=(document.getElementById('msq')||{value:''}).value.toLowerCase();
   const fs=(document.getElementById('mfst')||{value:''}).value;
-  let f=orders.filter(o=>o.agent===currentUser.name);
+  // Fix: check both agent and agent_name fields
+  let f=orders.filter(o=>{
+    const oAgent = o.agent || o.agent_name || '';
+    return oAgent === currentUser.name;
+  });
   f=f.filter(o=>{
     const m=!q||o.name.toLowerCase().includes(q)||o.phone.includes(q);
     return m&&(!fs||o.status===fs);
@@ -1397,7 +1401,7 @@ function RMO(){
 // AGENT: My stats
 function RMyStats(){
   if(!currentUser) return;
-  const myO=orders.filter(o=>o.agent===currentUser.name);
+  const myO=orders.filter(o=>(o.agent||o.agent_name||"")===currentUser.name);
   const cn=myO.filter(o=>o.status==='مؤكد').length;
   const ca=myO.filter(o=>o.status==='ملغى').length;
   const rf=myO.filter(o=>o.status==='رفض').length;
@@ -1485,10 +1489,44 @@ async function addOrder(){
   const name=document.getElementById('fn').value.trim(),phone=document.getElementById('fph').value.trim(),city=document.getElementById('fct').value;
   if(!name||!phone||!city){alert('الاسم، الهاتف، والمدينة مطلوبة!');return;}
   const status=document.getElementById('fst2').value,qty=parseInt(document.getElementById('fqty').value)||1,prd=document.getElementById('fprd').value;
-  let agentName='';const _faEl=document.getElementById('fagt');if(currentUser&&currentUser.role==='agent'){agentName=currentUser.name;}else{agentName=(_faEl&&_faEl.value)?_faEl.value:'';}
-  const orderData={name,phone,city,address:document.getElementById('fadr').value.trim(),product:prd,qty,track:document.getElementById('ftrk').value||genTrack(city),status,agent_name:agentName,date:new Date().toISOString().split('T')[0],followdate:document.getElementById('ffd').value||null,notes:document.getElementById('fnt').value.trim(),price:parseFloat(document.getElementById('fpr').value)||0};
-  const res=await api('POST','/orders',orderData);
-  if(res){orders.unshift(res.order);clearF();showToast('✅ تم حفظ الطلبية!');P(currentUser&&currentUser.role==='agent'?'myorders':'orders');}
+  
+  // Fix: always set agent name correctly for both admin and agent roles
+  let agentName='', agentId='';
+  if(currentUser && currentUser.role==='agent'){
+    agentName = currentUser.name;
+    agentId = currentUser.agentId || currentUser.id || '';
+  } else {
+    const _faEl=document.getElementById('fagt');
+    agentName = (_faEl && _faEl.value) ? _faEl.value : '';
+    // Find agent id from agents list
+    const foundAgent = agents.find(a=>a.name===agentName);
+    agentId = foundAgent ? foundAgent.id : '';
+  }
+  
+  const orderData={
+    name, phone, city,
+    address: document.getElementById('fadr').value.trim(),
+    product: prd, qty,
+    track: document.getElementById('ftrk').value || genTrack(city),
+    status,
+    agent: agentName,        // consistent field name
+    agent_name: agentName,   // send both for backend compatibility
+    agent_id: agentId,
+    date: new Date().toISOString().split('T')[0],
+    followdate: document.getElementById('ffd').value || null,
+    notes: document.getElementById('fnt').value.trim(),
+    price: parseFloat(document.getElementById('fpr').value) || 0
+  };
+  const res = await api('POST', '/orders', orderData);
+  if(res){
+    // Normalize the returned order to always have .agent field
+    const newOrder = res.order || res;
+    if(!newOrder.agent && newOrder.agent_name) newOrder.agent = newOrder.agent_name;
+    orders.unshift(newOrder);
+    clearF();
+    showToast('✅ تم حفظ الطلبية!');
+    P(currentUser && currentUser.role==='agent' ? 'myorders' : 'orders');
+  }
 }
 
 function clearF(){['fn','fph','fadr','fnt','ffd','fpr','ftrk'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('client-hist').style.display='none';}
@@ -1499,7 +1537,7 @@ function OE(i){
   document.getElementById('mttl').textContent='✏️ تعديل الطلبية';
   const cOpts=CITIES.map(c=>`<option value="${c}"${o.city===c?' selected':''}>${c}</option>`).join('');
   const pOpts=products.map(p=>`<option value="${p.name}"${o.product===p.name?' selected':''}>${p.name}</option>`).join('');
-  const aOpts=agents.map(a=>`<option value="${a.name}"${o.agent===a.name?' selected':''}>${a.name}</option>`).join('');
+  const aOpts=agents.map(a=>`<option value="${a.name}"${(o.agent||o.agent_name||"")===a.name?' selected':''}>${a.name}</option>`).join('');
   const sOpts=['مؤكد','ملغى','لم يرد','مؤجل','رفض','مشكل في التوصيل'].map(s=>`<option${o.status===s?' selected':''}>${s}</option>`).join('');
   const agentField=currentUser&&currentUser.role==='admin'?`<div class="fg"><label class="fl">Agent</label><select class="fs" id="eagt"><option value="">--</option>${aOpts}</select></div>`:'';
   document.getElementById('mbody').innerHTML=`
@@ -1528,9 +1566,16 @@ async function SE(){
   if(editIdx<0)return;
   const eagt=document.getElementById('eagt');
   const o=orders[editIdx];
-  const updates={name:document.getElementById('en').value.trim(),phone:document.getElementById('eph').value.trim(),address:document.getElementById('eadr').value.trim(),city:document.getElementById('ect').value,product:document.getElementById('eprd').value,qty:parseInt(document.getElementById('eqty').value)||1,track:document.getElementById('etrk').value.trim(),status:document.getElementById('est').value,agent_name:eagt?eagt.value:o.agent_name,followdate:document.getElementById('efd').value||null,price:parseFloat(document.getElementById('epr').value)||0,notes:document.getElementById('ent').value.trim()};
+  const agentVal = eagt ? eagt.value : (o.agent || o.agent_name || '');
+  const updates={name:document.getElementById('en').value.trim(),phone:document.getElementById('eph').value.trim(),address:document.getElementById('eadr').value.trim(),city:document.getElementById('ect').value,product:document.getElementById('eprd').value,qty:parseInt(document.getElementById('eqty').value)||1,track:document.getElementById('etrk').value.trim(),status:document.getElementById('est').value,agent:agentVal,agent_name:agentVal,followdate:document.getElementById('efd').value||null,price:parseFloat(document.getElementById('epr').value)||0,notes:document.getElementById('ent').value.trim()};
   const res=await api('PUT','/orders/'+o.id,updates);
-  if(res){orders[editIdx]=res.order;CM();if(currentUser&&currentUser.role==='agent')RMO();else RO();}
+  if(res){
+    const updated = res.order || res;
+    if(!updated.agent && updated.agent_name) updated.agent = updated.agent_name;
+    orders[editIdx]=updated;
+    CM();
+    if(currentUser&&currentUser.role==='agent')RMO();else RO();
+  }
 }
 function CM(){document.getElementById('mo').classList.remove('open');editIdx=-1;}
 
@@ -1559,7 +1604,7 @@ function RAG(){
       <button class="btn btn-d btn-sm" onclick="delAgent(${i})">🗑️</button>
     </div>`).join('')||'<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد Agents</div>';
   document.getElementById('agstats').innerHTML=agents.map(a=>{
-    const myO=orders.filter(o=>o.agent===a.name),cn=myO.filter(o=>o.status==='مؤكد').length,rate=myO.length?Math.round(cn/myO.length*100):0;
+    const myO=orders.filter(o=>(o.agent||o.agent_name||"")===a.name),cn=myO.filter(o=>o.status==='مؤكد').length,rate=myO.length?Math.round(cn/myO.length*100):0;
     return`<div style="padding:10px;border-radius:8px;background:var(--gray-bg);margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:13px">${a.name}</div><div style="color:#f39c12">${'★'.repeat(Math.round(rate/20))}${'☆'.repeat(5-Math.round(rate/20))}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"><span class="badge bc">${cn} مؤكد</span><span class="badge bn">${myO.length} إجمالي</span><span class="badge ${rate>=50?'bc':'bx'}">${rate}%</span></div></div>`;
   }).join('')||'<div style="color:var(--muted);text-align:center;padding:20px">لا توجد بيانات</div>';
 }
@@ -1567,7 +1612,7 @@ function RAG(){
 // ============ LEADERBOARD ============
 function RLB(){
   const data=agents.map(a=>{
-    const myO=orders.filter(o=>o.agent===a.name),cn=myO.filter(o=>o.status==='مؤكد').length,rate=myO.length?Math.round(cn/myO.length*100):0,rev=myO.filter(o=>o.status==='مؤكد').reduce((s,o)=>s+(parseFloat(o.price)||0),0);
+    const myO=orders.filter(o=>(o.agent||o.agent_name||"")===a.name),cn=myO.filter(o=>o.status==='مؤكد').length,rate=myO.length?Math.round(cn/myO.length*100):0,rev=myO.filter(o=>o.status==='مؤكد').reduce((s,o)=>s+(parseFloat(o.price)||0),0);
     return{a:a.name,cn,rate,t:myO.length,rev};
   }).sort((a,b)=>b.cn-a.cn);
   const M=['🥇','🥈','🥉'],C=['#f39c12','#95a5a6','#cd7f32'];
@@ -1591,7 +1636,7 @@ function RA(){
   const ags=agents.map(a=>a.name);
   if(ags.length){
     document.getElementById('agcw').style.height=Math.max(200,ags.length*50)+'px';
-    charts.ag=new Chart(document.getElementById('agC'),{type:'bar',data:{labels:ags,datasets:[{label:'مؤكد',data:ags.map(a=>filtA.filter(o=>o.agent===a&&o.status==='مؤكد').length),backgroundColor:'#1B5E35',borderRadius:4},{label:'ملغى',data:ags.map(a=>filtA.filter(o=>o.agent===a&&o.status==='ملغى').length),backgroundColor:'#d63031',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{beginAtZero:true}}}});
+    charts.ag=new Chart(document.getElementById('agC'),{type:'bar',data:{labels:ags,datasets:[{label:'مؤكد',data:ags.map(a=>filtA.filter(o=>(o.agent||o.agent_name||"")===a&&o.status==='مؤكد').length),backgroundColor:'#1B5E35',borderRadius:4},{label:'ملغى',data:ags.map(a=>filtA.filter(o=>(o.agent||o.agent_name||"")===a&&o.status==='ملغى').length),backgroundColor:'#d63031',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{beginAtZero:true}}}});
   }
   const s=getS(filtA);
   document.getElementById('dstats').innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${Object.entries({'✅ مؤكد':s.cn,'❌ ملغى':s.ca,'📵 لم يرد':s.na,'⏳ مؤجل':s.dl,'🚫 رفض':s.rf,'⚠️ مشكل':s.pb}).map(([k,v])=>`<div style="background:var(--gray-bg);padding:12px;border-radius:9px;text-align:center"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">${k}</div><div style="font-size:20px;font-weight:800">${v}</div><div style="font-size:10px;color:var(--muted)">${s.t?Math.round(v/s.t*100):0}%</div></div>`).join('')}</div>`;
@@ -1655,7 +1700,7 @@ function FT(t,el){ftab=t;document.querySelectorAll('#page-followup .tab').forEac
 function RF(){
   const td=new Date().toISOString().split('T')[0],tom=new Date();tom.setDate(tom.getDate()+1);const ts=tom.toISOString().split('T')[0];
   let src=orders;
-  if(currentUser&&currentUser.role==='agent') src=orders.filter(o=>o.agent===currentUser.name);
+  if(currentUser&&currentUser.role==='agent') src=orders.filter(o=>(o.agent||o.agent_name||"")===currentUser.name);
   let f;
   if(ftab==='u')f=src.filter(o=>o.followdate&&o.followdate<td);
   else if(ftab==='t')f=src.filter(o=>o.followdate===td);
@@ -1687,7 +1732,7 @@ async function sndAI(){
   msgs.innerHTML+=`<div class="ai-m user">${q}</div><div class="ai-m bot" id="aityp">⏳ جاري التحليل...</div>`;
   msgs.scrollTop=msgs.scrollHeight;
   const s=getS();
-  const agSt=agents.map(a=>{const my=orders.filter(o=>o.agent===a.name),cn=my.filter(o=>o.status==='مؤكد').length;return`${a.name}: ${cn}/${my.length}`;}).join(', ');
+  const agSt=agents.map(a=>{const my=orders.filter(o=>(o.agent||o.agent_name||"")===a.name),cn=my.filter(o=>o.status==='مؤكد').length;return`${a.name}: ${cn}/${my.length}`;}).join(', ');
   const cc={};orders.filter(o=>o.status==='مؤكد').forEach(o=>{cc[o.city]=(cc[o.city]||0)+1;});
   const topC=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([c,n])=>`${c}:${n}`).join(', ');
   const sys=`أنت AI Coach لـ Pharmacos Beauty. تتكلم بالدارجة المغربية. أعطي نصائح عملية ومحددة.\nالبيانات: طلبيات:${s.t} | مؤكد:${s.cn}(${s.rate}%) | ملغى:${s.ca} | مبيعات:${s.rev}MAD\nAgents: ${agSt||'لا يوجد'}\nأفضل مدن: ${topC||'لا يوجد'} | رتور:${returns.length} | قائمة سوداء:${blacklist.length}\nأجب بشكل مختصر وعملي.`;
@@ -1869,7 +1914,7 @@ function distAssignAll(){
   // Round-robin: find agent with least orders this month
   const month=new Date().toISOString().slice(0,7);
   const agentCounts={};
-  agents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>o.agent===a.name&&(o.date||'').startsWith(month)).length;});
+  agents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>(o.agent||o.agent_name||"")===a.name&&(o.date||'').startsWith(month)).length;});
   let added=0;
   pendingOrders.forEach(o=>{
     // Pick agent with minimum load
@@ -2020,7 +2065,7 @@ function RShip(){
   const company=(document.getElementById('ship-company')||{value:''}).value;
   const statusF=(document.getElementById('ship-status-f')||{value:''}).value;
   let src2=orders.filter(o=>o.status==='مؤكد');
-  if(currentUser&&currentUser.role==='agent')src2=src2.filter(o=>o.agent===currentUser.name);
+  if(currentUser&&currentUser.role==='agent')src2=src2.filter(o=>(o.agent||o.agent_name||"")===currentUser.name);
   if(q)src2=src2.filter(o=>o.name.toLowerCase().includes(q)||(o.track||'').includes(q));
   if(company)src2=src2.filter(o=>o.shipCompany===company);
   if(statusF)src2=src2.filter(o=>o.shipStatus===statusF);
@@ -2267,7 +2312,7 @@ async function doLoginAPI() {
   const pd = await api('GET','/products');
   const rd = await api('GET','/returns');
   const bd = await api('GET','/blacklist');
-  orders = od ? od.orders : [];
+  orders = od ? od.orders.map(o=>({...o, agent: o.agent||o.agent_name||''})) : [];
   agents = ad ? ad.agents : [];
   callLogs = cd ? cd.logs : [];
   products = pd ? pd.products : [];
@@ -2304,7 +2349,7 @@ window.doLogout = doLogout;
       const pd = await api('GET','/products');
       const rd = await api('GET','/returns');
       const bd = await api('GET','/blacklist');
-      orders = od ? od.orders : [];
+      orders = od ? od.orders.map(o=>({...o, agent: o.agent||o.agent_name||''})) : [];
       agents = ad ? ad.agents : [];
       callLogs = cd ? cd.logs : [];
       products = pd ? pd.products : [];
