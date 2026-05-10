@@ -1958,25 +1958,31 @@ function RDist(){
   updDistBadge();
 }
 
-function distAssign(i){
+async function distAssign(i){
   const o=pendingOrders[i];if(!o)return;
   const sel=document.getElementById('ag-sel-'+i);
   const ag=sel?sel.value:'';
   if(!ag){alert('اختر Agent أولاً!');return;}
-  const newOrder={
-    id:Date.now()+Math.random(),
-    name:o.name,phone:o.phone,address:o.address,city:o.city,
-    product:o.product,qty:o.qty,price:o.price,notes:o.notes,
-    track:genTrack(o.city),status:'لم يرد',
-    agent:ag,date:o.date,followdate:'',
-    shipCompany:'Glivo',shipStatus:'pending',callCount:0,callResult:'',shipReason:'',callReason:''
+
+  const orderData={
+    name:o.name, phone:o.phone, address:o.address||'', city:o.city,
+    product:o.product||'', qty:o.qty||1, price:o.price||0, notes:o.notes||'',
+    track:genTrack(o.city), status:'لم يرد',
+    agent_name:ag,
+    date:o.date||new Date().toISOString().split('T')[0],
+    ship_company:'Glivo', ship_status:'pending',
+    call_count:0, call_result:'', ship_reason:''
   };
-  orders.unshift(newOrder);
-  pendingOrders.splice(i,1);
-  save();
-  // Flash assigned row then re-render
-  RDist();RD();
-  showToast(`✅ ${o.name} → ${ag}`);
+
+  const res = await api('POST', '/orders', orderData);
+  if(res && res.order){
+    orders.unshift(normalizeOrder(res.order));
+    pendingOrders.splice(i,1);
+    RDist(); RD();
+    showToast(`✅ ${o.name} → ${ag}`);
+  } else {
+    showToast('⚠️ خطأ في الحفظ');
+  }
 }
 
 function distSkip(i){
@@ -1984,30 +1990,38 @@ function distSkip(i){
   RDist();
 }
 
-function distAssignAll(){
+async function distAssignAll(){
   if(!pendingOrders.length){alert('لا توجد طلبيات للتوزيع');return;}
   if(!agents.length){alert('أضف أجينتات أولاً');return;}
-  // Round-robin: find agent with least orders this month
+
   const month=new Date().toISOString().slice(0,7);
   const agentCounts={};
-  agents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>(o.agent||o.agent_name||"")===a.name&&(o.date||'').startsWith(month)).length;});
+  agents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>(o.agent||o.agent_name||'')===a.name&&(o.date||'').startsWith(month)).length;});
+
   let added=0;
-  pendingOrders.forEach(o=>{
-    // Pick agent with minimum load
+  const toAssign=[...pendingOrders];
+
+  for(const o of toAssign){
     const ag=agents.reduce((min,a)=>agentCounts[a.name]<agentCounts[min.name]?a:min,agents[0]);
-    orders.unshift({
-      id:Date.now()+Math.random(),
-      name:o.name,phone:o.phone,address:o.address,city:o.city,
-      product:o.product,qty:o.qty,price:o.price,notes:o.notes,
-      track:genTrack(o.city),status:'لم يرد',
-      agent:ag.name,date:o.date,followdate:'',
-      shipCompany:'Glivo',shipStatus:'pending',callCount:0,callResult:'',shipReason:'',callReason:''
-    });
-    agentCounts[ag.name]++;
-    added++;
-  });
+    const orderData={
+      name:o.name, phone:o.phone, address:o.address||'', city:o.city,
+      product:o.product||'', qty:o.qty||1, price:o.price||0, notes:o.notes||'',
+      track:genTrack(o.city), status:'لم يرد',
+      agent_name:ag.name,
+      date:o.date||new Date().toISOString().split('T')[0],
+      ship_company:'Glivo', ship_status:'pending',
+      call_count:0, call_result:'', ship_reason:''
+    };
+    const res = await api('POST', '/orders', orderData);
+    if(res && res.order){
+      orders.unshift(normalizeOrder(res.order));
+      agentCounts[ag.name]++;
+      added++;
+    }
+  }
+
   pendingOrders=[];
-  save();RDist();RD();
+  RDist(); RD();
   showToast(`⚡ تم توزيع ${added} طلبية على الأجينتات!`);
 }
 
