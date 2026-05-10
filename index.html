@@ -2334,7 +2334,7 @@ async function api(method, path, body) {
   }
   // Queue لتفادي الطلبات المتزامنة
   return _apiQueue = _apiQueue.then(async () => {
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 500));
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
     if (body) opts.body = JSON.stringify(body);
@@ -2383,11 +2383,18 @@ async function doLoginAPI() {
   currentUser = data.user;
   if (!currentUser.role) currentUser.role = 'agent';
   errEl.classList.remove('show');
-  const od = await api('GET','/orders');
-  const ad = await api('GET','/agents');
-  const cd = await api('GET','/calllogs');
-  const pd = await api('GET','/products');
-  const rd = await api('GET','/returns');
+  await loadAllData();
+  enterApp();
+}
+
+// Load all data sequentially with delays to avoid 429
+async function loadAllData() {
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const od = await api('GET','/orders'); await delay(300);
+  const ad = await api('GET','/agents'); await delay(300);
+  const cd = await api('GET','/calllogs'); await delay(300);
+  const pd = await api('GET','/products'); await delay(300);
+  const rd = await api('GET','/returns'); await delay(300);
   const bd = await api('GET','/blacklist');
   orders = od ? od.orders.map(o=>({...o, agent: o.agent||o.agent_name||''})) : [];
   agents = ad ? ad.agents : [];
@@ -2395,7 +2402,6 @@ async function doLoginAPI() {
   products = pd ? pd.products : [];
   returns = rd ? rd.returns : [];
   blacklist = bd ? bd.blacklist : [];
-  enterApp();
 }
 
 window.doLogin = doLoginAPI;
@@ -2420,18 +2426,7 @@ window.doLogout = doLogout;
     if (data && data.user) {
       currentUser = data.user;
       if (!currentUser.role) currentUser.role = 'agent';
-      const od = await api('GET','/orders');
-      const ad = await api('GET','/agents');
-      const cd = await api('GET','/calllogs');
-      const pd = await api('GET','/products');
-      const rd = await api('GET','/returns');
-      const bd = await api('GET','/blacklist');
-      orders = od ? od.orders.map(o=>({...o, agent: o.agent||o.agent_name||''})) : [];
-      agents = ad ? ad.agents : [];
-      callLogs = cd ? cd.logs : [];
-      products = pd ? pd.products : [];
-      returns = rd ? rd.returns : [];
-      blacklist = bd ? bd.blacklist : [];
+      await loadAllData();
       loadingDiv.remove();
       enterApp();
     } else {
