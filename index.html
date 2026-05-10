@@ -1066,7 +1066,7 @@ function enterApp(){
   badge.textContent=currentUser.role==='admin'?'Admin':currentUser.role==='manager'?'Manager':'Agent';
   badge.className='role-badge '+(isAdmin?'role-admin':'role-agent');
   buildSidebar();
-  P(isAdmin?'dash':'dash');
+  P(isAdmin?'dash':'mystats');
 }
 
 function doLogout(){
@@ -1112,7 +1112,6 @@ const ADMIN_MENU=[
 
 const AGENT_MENU=[
   {g:'Travail',items:[
-    {id:'dash',ic:'📊',label:'Dashboard'},
     {id:'add',ic:'➕',label:'Nouvelle commande'},
     {id:'myorders',ic:'📦',label:'طلبياتي',badge:'nb-orders'},
     {id:'shipping',ic:'🚚',label:'Expédition'},
@@ -1144,7 +1143,7 @@ const PAGE_TITLES={dash:'📊 Dashboard',shipping:'🚚 Expédition',distribute:
 function P(id){
   // Permission check for agent
   if(currentUser&&currentUser.role==='agent'){
-    const allowed=['dash','add','myorders','followup','mystats','leaderboard','shipping'];
+    const allowed=['add','myorders','followup','mystats','leaderboard','shipping'];
     if(!allowed.includes(id)) return;
   }
   document.querySelectorAll('.pages>div').forEach(d=>d.classList.remove('active'));
@@ -1457,23 +1456,6 @@ function RMyStats(){
           <div style="width:${targetPct}%;height:100%;background:linear-gradient(90deg,#f39c12,#e67e22);border-radius:8px;transition:width .5s"></div>
         </div>
         <div style="font-size:10px;opacity:.6;margin-top:4px;text-align:left">${targetPct}% de l'objectif</div>
-      </div>
-    </div>
-
-    <!-- KPIs الطلبيات -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-      <div class="kpi" style="text-align:center">
-        <div class="kl">Total</div>
-        <div class="kv">${total}</div>
-      </div>
-      <div class="kpi" style="text-align:center">
-        <div class="kl">Confirmées</div>
-        <div class="kv" style="color:var(--green)">${confirmed}</div>
-        <div class="ks" style="color:var(--green)">${confirmRate}%</div>
-      </div>
-      <div class="kpi" style="text-align:center">
-        <div class="kl">CA généré</div>
-        <div class="kv" style="font-size:18px;color:var(--pk)">${revenue.toLocaleString()} MAD</div>
       </div>
     </div>
 
