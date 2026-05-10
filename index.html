@@ -1066,7 +1066,7 @@ function enterApp(){
   badge.textContent=currentUser.role==='admin'?'Admin':currentUser.role==='manager'?'Manager':'Agent';
   badge.className='role-badge '+(isAdmin?'role-admin':'role-agent');
   buildSidebar();
-  P(isAdmin?'dash':'add');
+  P(isAdmin?'dash':'dash');
 }
 
 function doLogout(){
@@ -1112,13 +1112,14 @@ const ADMIN_MENU=[
 
 const AGENT_MENU=[
   {g:'Travail',items:[
+    {id:'dash',ic:'📊',label:'Dashboard'},
     {id:'add',ic:'➕',label:'Nouvelle commande'},
     {id:'myorders',ic:'📦',label:'طلبياتي',badge:'nb-orders'},
     {id:'shipping',ic:'🚚',label:'Expédition'},
     {id:'followup',ic:'🔔',label:'Suivi'},
   ]},
   {g:'الأداء',items:[
-    {id:'mystats',ic:'📊',label:'Mes stats'},
+    {id:'mystats',ic:'📈',label:'Mes stats'},
     {id:'leaderboard',ic:'🏆',label:'Classement'},
   ]},
 ];
@@ -1143,7 +1144,7 @@ const PAGE_TITLES={dash:'📊 Dashboard',shipping:'🚚 Expédition',distribute:
 function P(id){
   // Permission check for agent
   if(currentUser&&currentUser.role==='agent'){
-    const allowed=['add','myorders','followup','mystats','leaderboard','shipping'];
+    const allowed=['dash','add','myorders','followup','mystats','leaderboard','shipping'];
     if(!allowed.includes(id)) return;
   }
   document.querySelectorAll('.pages>div').forEach(d=>d.classList.remove('active'));
@@ -1401,38 +1402,133 @@ function RMO(){
 // AGENT: My stats
 function RMyStats(){
   if(!currentUser) return;
-  const myO=orders.filter(o=>(o.agent||o.agent_name||"")===currentUser.name);
-  const cn=myO.filter(o=>o.status==='مؤكد').length;
-  const ca=myO.filter(o=>o.status==='ملغى').length;
-  const rf=myO.filter(o=>o.status==='رفض').length;
-  const na=myO.filter(o=>o.status==='لم يرد').length;
-  const rate=myO.length?Math.round(cn/myO.length*100):0;
-  const rev=myO.filter(o=>o.status==='مؤكد').reduce((s,o)=>s+(parseFloat(o.price)||0),0);
-  const stars='★'.repeat(Math.round(rate/20))+'☆'.repeat(5-Math.round(rate/20));
-  
+  const myO = orders.filter(o=>(o.agent||o.agent_name||'')===currentUser.name);
+
+  // إحصائيات الطلبيات
+  const total = myO.length;
+  const confirmed = myO.filter(o=>o.status==='مؤكد').length;
+  const cancelled = myO.filter(o=>o.status==='ملغى').length;
+  const refused = myO.filter(o=>o.status==='رفض').length;
+  const noAnswer = myO.filter(o=>o.status==='لم يرد').length;
+  const delayed = myO.filter(o=>o.status==='مؤجل').length;
+  const confirmRate = total ? Math.round(confirmed/total*100) : 0;
+  const revenue = myO.filter(o=>o.status==='مؤكد').reduce((s,o)=>s+(parseFloat(o.price)||0),0);
+
+  // إحصائيات الشحن
+  const shipped = myO.filter(o=>o.status==='مؤكد');
+  const delivered = shipped.filter(o=>o.shipStatus==='delivered'||o.ship_status==='delivered').length;
+  const shipRefused = shipped.filter(o=>o.shipStatus==='refused'||o.ship_status==='refused').length;
+  const shipCancelled = shipped.filter(o=>o.shipStatus==='cancelled'||o.ship_status==='cancelled').length;
+  const inTransit = shipped.filter(o=>{const s=o.shipStatus||o.ship_status||'pending';return['pending','ready','voicemail','no1','no2','no3'].includes(s);}).length;
+  const deliveryRate = shipped.length ? Math.round(delivered/shipped.length*100) : 0;
+
+  // النجوم
+  const stars = '★'.repeat(Math.min(5,Math.round(confirmRate/20))) + '☆'.repeat(Math.max(0,5-Math.round(confirmRate/20)));
+
+  // الهدف
+  const agentData = agents.find(a=>a.name===currentUser.name);
+  const target = agentData ? (agentData.target||30) : 30;
+  const targetPct = Math.min(100, Math.round(confirmed/target*100));
+
   document.getElementById('my-stats-content').innerHTML=`
-    <div class="agent-profile-card" style="margin-bottom:14px">
+
+    <!-- Profile Card -->
+    <div style="background:linear-gradient(135deg,#0d2b1a,#1B5E35);border-radius:16px;padding:20px;margin-bottom:14px;color:#fff;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.05)"></div>
       <div style="display:flex;align-items:center;gap:16px;position:relative;z-index:1">
-        <div style="width:60px;height:60px;border-radius:50%;background:var(--pk);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;border:3px solid rgba(255,255,255,0.3)">${currentUser.name.slice(0,2)}</div>
-        <div>
+        <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;border:3px solid rgba(255,255,255,0.3)">${currentUser.name.slice(0,2)}</div>
+        <div style="flex:1">
           <div style="font-size:20px;font-weight:900">${currentUser.name}</div>
-          <div style="color:#f39c12;font-size:16px;margin:3px 0">${stars}</div>
-          <div style="font-size:12px;opacity:.7">Agent - Pharmacos Beauty</div>
+          <div style="color:#f39c12;font-size:15px;margin:3px 0">${stars}</div>
+          <div style="font-size:11px;opacity:.7">Agent · Pharmacos Beauty</div>
         </div>
-        <div style="margin-right:auto;text-align:left">
-          <div style="font-size:32px;font-weight:900;color:#f39c12">${rate}%</div>
-          <div style="font-size:11px;opacity:.7">Taux confirm.</div>
+        <div style="text-align:center">
+          <div style="font-size:36px;font-weight:900;color:#f39c12">${confirmRate}%</div>
+          <div style="font-size:11px;opacity:.7">Taux confirmation</div>
+        </div>
+      </div>
+      <!-- هدف الشهر -->
+      <div style="margin-top:16px;background:rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700">🎯 Objectif mensuel</span>
+          <span style="font-size:13px;font-weight:900;color:#f39c12">${confirmed} / ${target}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.15);border-radius:8px;height:10px;overflow:hidden">
+          <div style="width:${targetPct}%;height:100%;background:linear-gradient(90deg,#f39c12,#e67e22);border-radius:8px;transition:width .5s"></div>
+        </div>
+        <div style="font-size:10px;opacity:.6;margin-top:4px;text-align:left">${targetPct}% de l'objectif</div>
+      </div>
+    </div>
+
+    <!-- KPIs الطلبيات -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div class="kpi" style="text-align:center">
+        <div class="kl">Total</div>
+        <div class="kv">${total}</div>
+      </div>
+      <div class="kpi" style="text-align:center">
+        <div class="kl">Confirmées</div>
+        <div class="kv" style="color:var(--green)">${confirmed}</div>
+        <div class="ks" style="color:var(--green)">${confirmRate}%</div>
+      </div>
+      <div class="kpi" style="text-align:center">
+        <div class="kl">CA généré</div>
+        <div class="kv" style="font-size:18px;color:var(--pk)">${revenue.toLocaleString()} MAD</div>
+      </div>
+    </div>
+
+    <!-- نسبة التوصيل -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="ct">🚚 Taux de livraison</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+        <div style="position:relative;width:90px;height:90px;flex-shrink:0">
+          <svg viewBox="0 0 36 36" style="width:90px;height:90px;transform:rotate(-90deg)">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3"/>
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1B5E35" stroke-width="3"
+              stroke-dasharray="${deliveryRate} ${100-deliveryRate}" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:var(--pk)">${deliveryRate}%</div>
+        </div>
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:var(--green-light);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:900;color:var(--green)">${delivered}</div>
+            <div style="font-size:10px;color:var(--muted)">✅ Livrées</div>
+          </div>
+          <div style="background:var(--red-l);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:900;color:var(--red)">${shipRefused+shipCancelled}</div>
+            <div style="font-size:10px;color:var(--muted)">❌ Refus/Annul</div>
+          </div>
+          <div style="background:var(--blue-l);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:900;color:var(--blue)">${inTransit}</div>
+            <div style="font-size:10px;color:var(--muted)">⏳ En transit</div>
+          </div>
+          <div style="background:var(--orange-l);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:900;color:var(--orange)">${shipped.length}</div>
+            <div style="font-size:10px;color:var(--muted)">📦 Total expédiées</div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="kpig" style="grid-template-columns:repeat(3,1fr)">
-      <div class="kpi"><div class="kl">Total commandes</div><div class="kv">${myO.length}</div></div>
-      <div class="kpi"><div class="kl">Confirmées</div><div class="kv" style="color:var(--green)">${cn}</div></div>
-      <div class="kpi"><div class="kl">Annulées / Refus</div><div class="kv" style="color:var(--red)">${ca+rf}</div></div>
-    </div>
-    <div class="card" style="margin-top:14px">
-      <div class="ct">📊 Répartition de mes statuts</div>
-      ${Object.entries({'مؤكد':cn,'ملغى':ca,'لم يرد':na,'رفض':rf}).map(([s,n])=>`<div class="rbar"><div class="rbl">${s}</div><div class="rbp"><div class="rbf" style="width:${myO.length?Math.round(n/myO.length*100):0}%;background:var(--pk)"></div></div><div class="rbc">${n}</div></div>`).join('')}
+
+    <!-- توزيع الحالات -->
+    <div class="card">
+      <div class="ct">📊 Répartition des statuts</div>
+      ${[
+        {label:'مؤكد',n:confirmed,color:'var(--green)'},
+        {label:'ملغى',n:cancelled,color:'var(--red)'},
+        {label:'لم يرد',n:noAnswer,color:'var(--muted)'},
+        {label:'رفض',n:refused,color:'var(--purple)'},
+        {label:'مؤجل',n:delayed,color:'var(--orange)'},
+      ].map(({label,n,color})=>`
+        <div class="rbar" style="margin-bottom:8px">
+          <div class="rbl" style="width:65px;font-size:12px">${label}</div>
+          <div class="rbp" style="flex:1;background:var(--gray-bg);border-radius:6px;height:9px;overflow:hidden">
+            <div style="width:${total?Math.round(n/total*100):0}%;height:100%;background:${color};border-radius:6px;transition:width .5s"></div>
+          </div>
+          <div style="width:35px;text-align:left;font-size:12px;font-weight:700;color:${color}">${n}</div>
+          <div style="width:35px;text-align:left;font-size:11px;color:var(--muted)">${total?Math.round(n/total*100):0}%</div>
+        </div>
+      `).join('')}
     </div>`;
 }
 
