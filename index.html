@@ -1509,9 +1509,7 @@ async function addOrder(){
     product: prd, qty,
     track: document.getElementById('ftrk').value || genTrack(city),
     status,
-    agent: agentName,        // consistent field name
-    agent_name: agentName,   // send both for backend compatibility
-    agent_id: agentId,
+    agent_name: agentName,   // الاسم الصح في Supabase
     date: new Date().toISOString().split('T')[0],
     followdate: document.getElementById('ffd').value || null,
     notes: document.getElementById('fnt').value.trim(),
@@ -1519,9 +1517,9 @@ async function addOrder(){
   };
   const res = await api('POST', '/orders', orderData);
   if(res){
-    // Normalize the returned order to always have .agent field
     const newOrder = res.order || res;
-    if(!newOrder.agent && newOrder.agent_name) newOrder.agent = newOrder.agent_name;
+    // Normalize locally: always keep .agent for frontend filters
+    newOrder.agent = newOrder.agent_name || agentName;
     orders.unshift(newOrder);
     clearF();
     showToast('✅ تم حفظ الطلبية!');
@@ -1567,11 +1565,11 @@ async function SE(){
   const eagt=document.getElementById('eagt');
   const o=orders[editIdx];
   const agentVal = eagt ? eagt.value : (o.agent || o.agent_name || '');
-  const updates={name:document.getElementById('en').value.trim(),phone:document.getElementById('eph').value.trim(),address:document.getElementById('eadr').value.trim(),city:document.getElementById('ect').value,product:document.getElementById('eprd').value,qty:parseInt(document.getElementById('eqty').value)||1,track:document.getElementById('etrk').value.trim(),status:document.getElementById('est').value,agent:agentVal,agent_name:agentVal,followdate:document.getElementById('efd').value||null,price:parseFloat(document.getElementById('epr').value)||0,notes:document.getElementById('ent').value.trim()};
+  const updates={name:document.getElementById('en').value.trim(),phone:document.getElementById('eph').value.trim(),address:document.getElementById('eadr').value.trim(),city:document.getElementById('ect').value,product:document.getElementById('eprd').value,qty:parseInt(document.getElementById('eqty').value)||1,track:document.getElementById('etrk').value.trim(),status:document.getElementById('est').value,agent_name:agentVal,followdate:document.getElementById('efd').value||null,price:parseFloat(document.getElementById('epr').value)||0,notes:document.getElementById('ent').value.trim()};
   const res=await api('PUT','/orders/'+o.id,updates);
   if(res){
     const updated = res.order || res;
-    if(!updated.agent && updated.agent_name) updated.agent = updated.agent_name;
+    updated.agent = updated.agent_name || agentVal;
     orders[editIdx]=updated;
     CM();
     if(currentUser&&currentUser.role==='agent')RMO();else RO();
