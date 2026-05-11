@@ -2442,16 +2442,22 @@ async function api(method, path, body) {
   }
   // Queue لتفادي الطلبات المتزامنة
   return _apiQueue = _apiQueue.then(async () => {
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 300));
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
     if (body) opts.body = JSON.stringify(body);
     try {
       let res = await fetch(API_URL + path, opts);
-      // Retry بعد 2 ثانية إذا 429
+      // Retry مع delays أطول إذا 429
       if(res.status === 429) {
-        await new Promise(r => setTimeout(r, 2000));
+        console.warn('429 على', path, '— ننتظر 5 ثواني...');
+        await new Promise(r => setTimeout(r, 5000));
         res = await fetch(API_URL + path, opts);
+        // Retry ثاني إذا باقي 429
+        if(res.status === 429) {
+          await new Promise(r => setTimeout(r, 10000));
+          res = await fetch(API_URL + path, opts);
+        }
       }
       const data = await res.json();
       if (res.status === 401) {
@@ -2463,7 +2469,6 @@ async function api(method, path, body) {
       }
       if (!res.ok) throw new Error(data.error || 'Erreur API');
       if(method === 'GET') _cache[cacheKey] = {t: Date.now(), d: data};
-      // Clear cache for related endpoints after write
       if(method !== 'GET') {
         const base = path.split('/')[1];
         Object.keys(_cache).forEach(k => { if(k.includes(base)) delete _cache[k]; });
