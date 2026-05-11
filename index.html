@@ -1906,8 +1906,6 @@ function parseSheetCSV(text){
     const name=o.name||o.nom||o.client||'';
     const phone=o.phone||o.tel||o.telephone||'';
     if(!name.trim()||!phone.trim())continue;
-    // تحقق من التكرار مع الطلبيات الحالية في Supabase
-    if(phone && orders.find(ex=>(ex.phone||'')===(phone.trim()))) continue;
     mapped.push({
       _sheetId: phone+'_'+Date.now()+'_'+i,
       name: name.trim(),
