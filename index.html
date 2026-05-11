@@ -1952,7 +1952,7 @@ function RDist(){
           <td>
             <select class="fs" id="ag-sel-${i}" style="min-width:110px">
               <option value="">— اختر Agent —</option>
-              ${agents.map(a=>`<option value="${a.name}">${a.name}</option>`).join('')}
+              ${agents.filter(a=>a.role!=='manager'&&a.role!=='admin').map(a=>`<option value="${a.name}">${a.name}</option>`).join('')}
             </select>
           </td>
           <td>
@@ -2023,9 +2023,12 @@ async function distAssignAll(){
   if(!pendingOrders.length){alert('لا توجد طلبيات للتوزيع');return;}
   if(!agents.length){alert('أضف أجينتات أولاً');return;}
 
+  // فقط الـ Agents — بدون Manager و Admin
+  const assignableAgents = agents.filter(a=>a.role!=='manager'&&a.role!=='admin');
+  if(!assignableAgents.length){alert('لا يوجد Agents للتوزيع');return;}
   const month=new Date().toISOString().slice(0,7);
   const agentCounts={};
-  agents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>(o.agent||o.agent_name||'')===a.name&&(o.date||'').startsWith(month)).length;});
+  assignableAgents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>(o.agent||o.agent_name||'')===a.name&&(o.date||'').startsWith(month)).length;});
 
   let added=0, skipped=0;
   const toAssign=[...pendingOrders];
@@ -2038,7 +2041,7 @@ async function distAssignAll(){
 
     if(!name||!phone){skipped++;continue;}
 
-    const ag=agents.reduce((min,a)=>agentCounts[a.name]<agentCounts[min.name]?a:min,agents[0]);
+    const ag=assignableAgents.reduce((min,a)=>agentCounts[a.name]<agentCounts[min.name]?a:min,assignableAgents[0]);
     const orderData={
       name, phone, city,
       address:(o.address||o.adresse||'').trim(),
