@@ -1891,14 +1891,15 @@ function parseSheetCSV(text){
     const v=lines[i].split(',').map(x=>x.trim().replace(/"/g,''));
     if(v.length<2)continue;
     const o={};h.forEach((hh,j)=>{o[hh]=v[j]||'';});
-    if(!o.name&&!o.phone)continue;
+    const name=o.name||o.nom||o.client||'';
     const phone=o.phone||o.tel||o.telephone||'';
+    if(!name.trim()||!phone.trim())continue;
     // Skip if already exists in orders
     if(phone&&orders.find(ex=>ex.phone===phone))continue;
     mapped.push({
       _sheetId: phone+'_'+Date.now()+'_'+i,
-      name:o.name||o.nom||o.client||'',
-      phone:phone,
+      name: name.trim(),
+      phone: phone.trim(),
       address:o.address||o.adresse||o.adress||'',
       city:o.city||o.ville||o.مدينة||'',
       product:o.product||o.produit||o.منتج||'',
@@ -1964,14 +1965,32 @@ async function distAssign(i){
   const ag=sel?sel.value:'';
   if(!ag){alert('اختر Agent أولاً!');return;}
 
+  // تحقق من الحقول الإلزامية
+  const name = (o.name||o.nom||o.client||'').trim();
+  const phone = (o.phone||o.tel||o.telephone||'').trim();
+  const city = (o.city||o.ville||'').trim();
+
+  if(!name||!phone){
+    alert(`❌ الطلبية رقم ${i+1} ناقصة الاسم أو الهاتف!\nاسم: "${name}" | هاتف: "${phone}"`);
+    return;
+  }
+
   const orderData={
-    name:o.name, phone:o.phone, address:o.address||'', city:o.city,
-    product:o.product||'', qty:o.qty||1, price:o.price||0, notes:o.notes||'',
-    track:genTrack(o.city), status:'لم يرد',
-    agent_name:ag,
-    date:o.date||new Date().toISOString().split('T')[0],
-    ship_company:'Glivo', ship_status:'pending',
-    call_count:0, call_result:'', ship_reason:''
+    name, phone, city,
+    address: (o.address||o.adresse||'').trim(),
+    product: (o.product||o.produit||'').trim(),
+    qty: parseInt(o.qty)||1,
+    price: parseFloat(o.price)||0,
+    notes: (o.notes||'').trim(),
+    track: genTrack(city),
+    status: 'لم يرد',
+    agent_name: ag,
+    date: o.date||new Date().toISOString().split('T')[0],
+    ship_company: 'Glivo',
+    ship_status: 'pending',
+    call_count: 0,
+    call_result: '',
+    ship_reason: ''
   };
 
   const res = await api('POST', '/orders', orderData);
@@ -1979,9 +1998,9 @@ async function distAssign(i){
     orders.unshift(normalizeOrder(res.order));
     pendingOrders.splice(i,1);
     RDist(); RD();
-    showToast(`✅ ${o.name} → ${ag}`);
+    showToast(`✅ ${name} → ${ag}`);
   } else {
-    showToast('⚠️ خطأ في الحفظ');
+    showToast('⚠️ خطأ في الحفظ — تحقق من البيانات');
   }
 }
 
@@ -1998,20 +2017,33 @@ async function distAssignAll(){
   const agentCounts={};
   agents.forEach(a=>{agentCounts[a.name]=orders.filter(o=>(o.agent||o.agent_name||'')===a.name&&(o.date||'').startsWith(month)).length;});
 
-  let added=0;
+  let added=0, skipped=0;
   const toAssign=[...pendingOrders];
+  pendingOrders=[];
 
   for(const o of toAssign){
+    const name=(o.name||o.nom||o.client||'').trim();
+    const phone=(o.phone||o.tel||o.telephone||'').trim();
+    const city=(o.city||o.ville||'').trim();
+
+    if(!name||!phone){skipped++;continue;}
+
     const ag=agents.reduce((min,a)=>agentCounts[a.name]<agentCounts[min.name]?a:min,agents[0]);
     const orderData={
-      name:o.name, phone:o.phone, address:o.address||'', city:o.city,
-      product:o.product||'', qty:o.qty||1, price:o.price||0, notes:o.notes||'',
-      track:genTrack(o.city), status:'لم يرد',
+      name, phone, city,
+      address:(o.address||o.adresse||'').trim(),
+      product:(o.product||o.produit||'').trim(),
+      qty:parseInt(o.qty)||1,
+      price:parseFloat(o.price)||0,
+      notes:(o.notes||'').trim(),
+      track:genTrack(city),
+      status:'لم يرد',
       agent_name:ag.name,
       date:o.date||new Date().toISOString().split('T')[0],
       ship_company:'Glivo', ship_status:'pending',
       call_count:0, call_result:'', ship_reason:''
     };
+
     const res = await api('POST', '/orders', orderData);
     if(res && res.order){
       orders.unshift(normalizeOrder(res.order));
@@ -2020,9 +2052,8 @@ async function distAssignAll(){
     }
   }
 
-  pendingOrders=[];
   RDist(); RD();
-  showToast(`⚡ تم توزيع ${added} طلبية على الأجينتات!`);
+  showToast(`⚡ تم توزيع ${added} طلبية!${skipped?` (${skipped} مرفوضة - ناقصة بيانات)`:''}`);
 }
 
 function updDistBadge(){
