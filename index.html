@@ -1855,6 +1855,10 @@ async function fetchSheetOrders(){
     }
     const csvUrl=getSheetCsvUrl(url);
     if(!csvUrl){alert('❌ الرابط غير صحيح');if(btn){btn.disabled=false;btn.textContent='🔄 Importer depuis Google Sheets';}return;}
+    // نجيب الطلبيات الحديثة من Supabase قبل التحقق من التكرار
+    delete _cache['GET/orders'];
+    const od = await api('GET','/orders');
+    if(od && od.orders) orders = od.orders.map(normalizeOrder);
     const res=await fetch(csvUrl);
     if(!res.ok)throw new Error('فشل الجلب: '+res.status);
     const text=await res.text();
@@ -1875,8 +1879,11 @@ async function fetchSheetOrders(){
   if(btn){btn.disabled=false;btn.textContent='🔄 Importer depuis Google Sheets';}
 }
 
-function hDistCSV(e){
+async function hDistCSV(e){
   const f=e.target.files[0];if(!f)return;
+  // نجيب الطلبيات الحديثة من API قبل التحقق من التكرار
+  const od = await api('GET','/orders');
+  if(od && od.orders) orders = od.orders.map(normalizeOrder);
   const r=new FileReader();
   r.onload=ev=>parseSheetCSV(ev.target.result);
   r.readAsText(f);
@@ -1894,8 +1901,8 @@ function parseSheetCSV(text){
     const name=o.name||o.nom||o.client||'';
     const phone=o.phone||o.tel||o.telephone||'';
     if(!name.trim()||!phone.trim())continue;
-    // Skip if already exists in orders
-    if(phone&&orders.find(ex=>ex.phone===phone))continue;
+    // تحقق من التكرار مع الطلبيات الحالية في Supabase
+    if(phone && orders.find(ex=>(ex.phone||'')===(phone.trim()))) continue;
     mapped.push({
       _sheetId: phone+'_'+Date.now()+'_'+i,
       name: name.trim(),
