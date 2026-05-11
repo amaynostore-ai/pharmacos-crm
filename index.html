@@ -1621,7 +1621,7 @@ function OE(i){
       <div class="fg"><label class="fl">الاسم</label><input class="fi" id="en" value="${o.name||''}"/></div>
       <div class="fg"><label class="fl">الهاتف</label><input class="fi" id="eph" value="${o.phone||''}"/></div>
       <div class="fg"><label class="fl">Adresse</label><input class="fi" id="eadr" value="${o.address||''}"/></div>
-      <div class="fg"><label class="fl">Ville</label><select class="fs" id="ect"><option value="">--</option>${cOpts}</select></div>
+      <div class="fg" style="position:relative"><label class="fl">Ville</label><input class="fi" id="ect" value="${o.city||''}" placeholder="ابحث عن مدينة..." autocomplete="off" oninput="filterCities('ect','ect-list')" onfocus="filterCities('ect','ect-list')" onblur="setTimeout(()=>{const l=document.getElementById('ect-list');if(l)l.style.display='none'},200)"><div id="ect-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></div>
       <div class="fg"><label class="fl">Produit</label><select class="fs" id="eprd"><option value="">--</option>${pOpts}</select></div>
       <div class="fg"><label class="fl">Quantité</label><input class="fi" id="eqty" type="number" value="${o.qty||1}"/></div>
       <div class="fg"><label class="fl">رقم التتبع</label><input class="fi" id="etrk" value="${o.track||''}"/></div>
