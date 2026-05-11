@@ -1855,10 +1855,15 @@ async function fetchSheetOrders(){
     }
     const csvUrl=getSheetCsvUrl(url);
     if(!csvUrl){alert('❌ الرابط غير صحيح');if(btn){btn.disabled=false;btn.textContent='🔄 Importer depuis Google Sheets';}return;}
-    // نجيب الطلبيات الحديثة من Supabase قبل التحقق من التكرار
-    delete _cache['GET/orders'];
-    const od = await api('GET','/orders');
-    if(od && od.orders) orders = od.orders.map(normalizeOrder);
+    // نجيب الطلبيات الحديثة مباشرة من Supabase (بدون cache)
+    try {
+      const freshRes = await fetch(API_URL+'/orders', {headers:{'Authorization':'Bearer '+_token,'Content-Type':'application/json'}});
+      const freshData = await freshRes.json();
+      if(freshData && freshData.orders) {
+        orders = freshData.orders.map(normalizeOrder);
+        _cache['GET/orders'] = {t: Date.now(), d: freshData};
+      }
+    } catch(e) { console.warn('Fresh orders fetch failed:', e); }
     const res=await fetch(csvUrl);
     if(!res.ok)throw new Error('فشل الجلب: '+res.status);
     const text=await res.text();
