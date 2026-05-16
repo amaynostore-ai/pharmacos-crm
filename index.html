@@ -104,6 +104,7 @@ body{background:var(--gray-bg);color:var(--text);min-height:100vh;font-family:'C
 .role-badge{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;}
 .role-admin{background:linear-gradient(135deg,var(--pk-light),#fdd);color:var(--pk);}
 .role-agent{background:var(--blue-l);color:var(--blue);}
+.role-manager{background:var(--orange-l);color:var(--orange);}
 
 #main{margin-left:var(--sw);margin-top:var(--th);flex:1;padding:20px;}
 .pages>div{display:none;}
@@ -1064,7 +1065,7 @@ function enterApp(){
   document.getElementById('sb-urole').textContent=currentUser.role==='admin'?'مدير النظام':currentUser.role==='manager'?'Manager':'Agent';
   const badge=document.getElementById('role-badge');
   badge.textContent=currentUser.role==='admin'?'Admin':currentUser.role==='manager'?'Manager':'Agent';
-  badge.className='role-badge '+(isAdmin?'role-admin':'role-agent');
+  badge.className='role-badge '+(currentUser.role==='admin'?'role-admin':currentUser.role==='manager'?'role-manager':'role-agent');
   buildSidebar();
   P(isAdmin?'dash':'mystats');
 }
@@ -1687,7 +1688,7 @@ function RAG(){
 
 // ============ LEADERBOARD ============
 function RLB(){
-  const data=agents.map(a=>{
+  const data=agents.filter(a=>a.role!=='admin'&&a.role!=='manager').map(a=>{
     const myO=orders.filter(o=>(o.agent||o.agent_name||"")===a.name),cn=myO.filter(o=>o.status==='مؤكد').length,rate=myO.length?Math.round(cn/myO.length*100):0,rev=myO.filter(o=>o.status==='مؤكد').reduce((s,o)=>s+(parseFloat(o.price)||0),0);
     return{a:a.name,cn,rate,t:myO.length,rev};
   }).sort((a,b)=>b.cn-a.cn);
